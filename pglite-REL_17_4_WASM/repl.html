@@ -752,10 +752,10 @@ SET ROLE test_user;
                 var port = Module.cma_port || 1
                 // Module._ping()
 
-                Module._interactive_write(count)
+                // Module._interactive_write(count)
                 console.log("send_to_pglite(cma):", count, "sent to", port)
                 Module.HEAPU8.set(resultArray, port)
-                Module._interactive_one()
+                Module._interactive_one(count)
 
             } else {
                 console.warn("BC(srv):", ev);

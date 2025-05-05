@@ -1,7 +1,7 @@
 echo "============= link imports : begin ==============="
 
 # TODO : make a C-API list
-# _main,_getenv,_setenv,_interactive_one,_interactive_write,_interactive_read,_pg_initdb,_pg_shutdown
+# _main,_getenv,_setenv,_interactive_one,_pg_initdb,_interactive_read,_pg_shutdown
 
 
 # extract own pg lib requirements
@@ -60,7 +60,6 @@ _error_context_stack
 _getenv
 _interactive_one
 _interactive_read
-_interactive_write
 _lowerstr
 _main
 _pg_initdb

@@ -173,12 +173,12 @@ volatile bool is_wire = true;
 extern char * cma_port;
 
 
-__attribute__((export_name("interactive_write"))) // EMSCRIPTEN_KEEPALIVE
-void
-interactive_write(int size) {
-    cma_rsize = size;
-    cma_wsize = 0;
-}
+// __attribute__((export_name("interactive_write"))) // EMSCRIPTEN_KEEPALIVE
+// void
+// interactive_write(int size) {
+//     cma_rsize = size;
+//     cma_wsize = 0;
+// }
 
 __attribute__((export_name("ping")))
 void
@@ -329,7 +329,7 @@ PDEBUG("# 305: TODO: set a pg_main started flag");
 extern void pg_startcma();
 
 EMSCRIPTEN_KEEPALIVE void
-interactive_one() {
+interactive_one(int size) {
     int	peek = -1;  /* preview of firstchar with no pos change */
 	int firstchar = 0;  /* character read from getc() */
     bool pipelining = true;
@@ -338,6 +338,9 @@ interactive_one() {
     FILE *stream ;
     FILE *fp;
     int packetlen;
+
+    cma_rsize = size;
+    cma_wsize = 0;
 
     bool had_notification = notifyInterruptPending;
     bool notified = false;
