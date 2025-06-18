@@ -66,7 +66,7 @@ _pgl_closed
 _pgl_initdb
 _pgl_shutdown
 _use_wire
-
+_set_read_write_cbs
 _main
 
 _ErrorContext

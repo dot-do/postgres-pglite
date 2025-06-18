@@ -165,10 +165,10 @@ else
     export CC=$(which emcc)
 
 
-    EXPORTED_FUNCTIONS="_main,_use_wire,_pgl_initdb,_pgl_backend,_pgl_shutdown,_interactive_write,_interactive_read,_interactive_one"
+    EXPORTED_FUNCTIONS="_main,_use_wire,_pgl_initdb,_pgl_backend,_pgl_shutdown,_interactive_write,_interactive_read,_interactive_one,_set_read_write_cbs"
     EXPORTED_FUNCTIONS="$EXPORTED_FUNCTIONS,_get_channel,_get_buffer_size,_get_buffer_addr"
 
-    EXPORTED_RUNTIME_METHODS="MEMFS,IDBFS,FS,setValue,getValue,UTF8ToString,stringToNewUTF8,stringToUTF8OnStack"
+    EXPORTED_RUNTIME_METHODS="MEMFS,IDBFS,FS,setValue,getValue,UTF8ToString,stringToNewUTF8,stringToUTF8OnStack,addFunction,removeFunction"
 
 
     if $DEBUG

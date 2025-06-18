@@ -36,6 +36,26 @@ get_channel() {
     return channel;
 }
 
+// read FROM JS
+// (i guess return number of bytes written)
+// ssize_t pglite_read(/* ignored */ int socket, void *buffer, size_t length,/* ignored */ int flags,/* ignored */ void *address,/* ignored */ socklen_t *address_len);
+//typedef ssize_t (*pglite_read_t)(/* ignored */ int socket, void *buffer, size_t length,/* ignored */ int flags,/* ignored */ void *address,/* ignored */ unsigned int *address_len);
+typedef ssize_t (*pglite_read_t)(void *buffer, size_t max_length);
+extern pglite_read_t pglite_read;
+
+// write TO JS
+// (i guess return number of bytes read)
+// ssize_t pglite_write(/* ignored */ int sockfd, const void *buf, size_t len, /* ignored */ int flags);
+// typedef ssize_t (*pglite_write_t)(/* ignored */ int sockfd, const void *buf, size_t len, /* ignored */ int flags);
+typedef ssize_t (*pglite_write_t)(void *buffer, size_t length);
+extern pglite_write_t pglite_write;
+
+__attribute__((export_name("set_read_write_cbs")))
+void
+set_read_write_cbs(pglite_read_t read_cb, pglite_write_t write_cb) {
+    pglite_read = read_cb;
+    pglite_write = write_cb;
+}
 
 __attribute__((export_name("interactive_read")))
 int
@@ -368,15 +388,15 @@ PDEBUG("# 330: TODO: set a pgl started flag");
 extern void pg_startcma();
 
 __attribute__((export_name("interactive_one"))) void
-interactive_one() {
-    int	peek = -1;  /* preview of firstchar with no pos change */
+interactive_one(int packetlen, int peek) {
+    // int	peek = -1;  /* preview of firstchar with no pos change */
 	int firstchar = 0;  /* character read from getc() */
     bool pipelining = true;
 	StringInfoData input_message;
 	StringInfoData *inBuf;
     FILE *stream ;
     FILE *fp = NULL;
-    int packetlen;
+    // int packetlen;
 
     bool had_notification = notifyInterruptPending;
     bool notified = false;
@@ -456,95 +476,105 @@ interactive_one() {
  * TODO: allow to redirect stdout for fully external repl.
  */
 
-    peek = IO[0];
-    packetlen = cma_rsize;
-
-    if (cma_rsize) {
-        sockfiles = false;
-        if (!is_repl) {
-            whereToSendOutput = DestRemote;
-            if (!is_wire)
-                PDEBUG("# 439: repl message in cma buffer !");
-        } else {
-            if (is_wire)
-                PDEBUG("# 442: wire message in cma buffer for REPL !");
-            whereToSendOutput = DestDebug;
-        }
+    if (!is_repl) {
+        whereToSendOutput = DestRemote;
+        if (!is_wire)
+            PDEBUG("# 439: repl message in cma buffer !");
     } else {
-        fp = fopen(PGS_IN, "r");
-PDEBUG("# 452:" PGS_IN "\n");
-        // read file in socket buffer for SocketBackend to consumme.
-        if (fp) {
-            fseek(fp, 0L, SEEK_END);
-            packetlen = ftell(fp);
-            if (packetlen) {
-                // set to always true if no REPL.
-//                is_wire = true;
-                resetStringInfo(inBuf);
-                rewind(fp);
-                /* peek on first char */
-                peek = getc(fp);
-                rewind(fp);
-                if (is_repl && !is_wire) {
-                    // sql in buffer
-                    for (int i=0; i<packetlen; i++) {
-                        appendStringInfoChar(inBuf, fgetc(fp));
-                    }
-                    sockfiles = false;
-                } else {
-                    // auth won't go to REPL, ever.
-                    whereToSendOutput = DestRemote;
-                    // wire in socket reader
-                    pq_recvbuf_fill(fp, packetlen);
-                    sockfiles = true;
-                }
+        if (is_wire)
+            PDEBUG("# 442: wire message in cma buffer for REPL !");
+        whereToSendOutput = DestDebug;
+    }
 
-                /* is it startup/auth packet ? */
-                if (!peek) {
-                    startup_auth();
-                    peek = -1;
-                }
-                if (peek==112) {
-                    startup_pass(true);
-                    peek = -1;
-                }
-            }
+//     packetlen = cma_rsize;
 
-            /* do not forget FD CLEANUP in all cases */
-//            fclose(fp);
-//            unlink(PGS_IN);
+//     if (cma_rsize) {
+//         peek = IO[0];
+//         sockfiles = false;
+//         if (!is_repl) {
+//             whereToSendOutput = DestRemote;
+//             if (!is_wire)
+//                 PDEBUG("# 439: repl message in cma buffer !");
+//         } else {
+//             if (is_wire)
+//                 PDEBUG("# 442: wire message in cma buffer for REPL !");
+//             whereToSendOutput = DestDebug;
+//         }
+//     } else {
+//         fp = fopen(PGS_IN, "r");
+// PDEBUG("# 452:" PGS_IN "\n");
+//         // read file in socket buffer for SocketBackend to consumme.
+//         if (fp) {
+//             fseek(fp, 0L, SEEK_END);
+//             packetlen = ftell(fp);
+//             if (packetlen) {
+//                 // set to always true if no REPL.
+// //                is_wire = true;
+//                 resetStringInfo(inBuf);
+//                 rewind(fp);
+//                 /* peek on first char */
+//                 peek = getc(fp);
+//                 rewind(fp);
+//                 if (is_repl && !is_wire) {
+//                     // sql in buffer
+//                     for (int i=0; i<packetlen; i++) {
+//                         appendStringInfoChar(inBuf, fgetc(fp));
+//                     }
+//                     sockfiles = false;
+//                 } else {
+//                     // auth won't go to REPL, ever.
+//                     whereToSendOutput = DestRemote;
+//                     // wire in socket reader
+//                     pq_recvbuf_fill(fp, packetlen);
+//                     sockfiles = true;
+//                 }
 
-            if (packetlen) {
-                // it was startup/auth , write and return fast.
-                if (peek<0) {
-                    PDEBUG("# 492: handshake/auth/pass skip");
-                    goto wire_flush;
-                }
+//                 /* is it startup/auth packet ? */
+//                 if (!peek) {
+//                     startup_auth();
+//                     peek = -1;
+//                 }
+//                 if (peek==112) {
+//                     startup_pass(true);
+//                     peek = -1;
+//                 }
+//             }
 
-                /* else it was wire msg or sql */
-#if PGDEBUG
-                if (is_wire) {
-                    printf("# 499: is_wire -> true : %c\n", peek);
-                    force_echo = true;
-                }
+//             /* do not forget FD CLEANUP in all cases */
+// //            fclose(fp);
+// //            unlink(PGS_IN);
 
-#endif
-                firstchar = peek;
-                goto incoming;
-            } // wire msg
-PDEBUG("# 507: NO DATA:" PGS_IN  "\n");
-        } // fp data read
+//             if (packetlen) {
+//                 // it was startup/auth , write and return fast.
+//                 if (peek<0) {
+//                     PDEBUG("# 492: handshake/auth/pass skip");
+//                     goto wire_flush;
+//                 }
 
-        // is it REPL in cma ?
-        if (!peek)
-            goto return_early;
+//                 /* else it was wire msg or sql */
+// #if PGDEBUG
+//                 if (is_wire) {
+//                     printf("# 499: is_wire -> true : %c\n", peek);
+//                     force_echo = true;
+//                 }
 
-        firstchar = peek ;
+// #endif
+//                 firstchar = peek;
+//                 goto incoming;
+//             } // wire msg
+// PDEBUG("# 507: NO DATA:" PGS_IN  "\n");
+//         } // fp data read
 
-        //REPL mode  in zero copy buffer ( lowest wasm memory segment )
-        packetlen = strlen(IO);
+//         // is it REPL in cma ?
+//         if (!peek)
+//             goto return_early;
 
-    } // !cma_rsize -> socketfiles -> repl
+//         firstchar = peek ;
+
+//         //REPL mode  in zero copy buffer ( lowest wasm memory segment )
+//         packetlen = strlen(IO);
+
+//     } // !cma_rsize -> socketfiles -> repl
 
 #if PGDEBUG
     if (packetlen)
@@ -554,11 +584,11 @@ PDEBUG("# 507: NO DATA:" PGS_IN  "\n");
 
     resetStringInfo(inBuf);
     // when cma buffer is used to fake stdin, data is not read by socket/wire backend.
-    if (is_repl) {
-        for (int i=0; i<packetlen; i++) {
-            appendStringInfoChar(inBuf, IO[i]);
-        }
-    }
+    // if (is_repl) {
+    //     for (int i=0; i<packetlen; i++) {
+    //         appendStringInfoChar(inBuf, IO[i]);
+    //     }
+    // }
 
     if (packetlen<2) {
         puts("# 536: WARNING: empty packet");
@@ -683,50 +713,50 @@ wire_flush:
             PDEBUG("# 609: end packet (ClientAuthInProgress - no rfq)\n");
         }
 
-        if (SOCKET_DATA>0) {
-            if (sockfiles) {
-                channel = -1;
-                if (cma_wsize) {
-                    puts("ERROR: cma was not flushed before socketfile interface");
-                }
-            } else {
-                /* wsize may have increased with previous rfq so assign here */
-                cma_wsize = SOCKET_DATA;
-                channel = cma_rsize + 2;
-            }
-            if (SOCKET_FILE) {
-                int outb = SOCKET_DATA;
-                fclose(SOCKET_FILE);
-                SOCKET_FILE = NULL;
-                SOCKET_DATA = 0;
+//         if (SOCKET_DATA>0) {
+//             if (sockfiles) {
+//                 channel = -1;
+//                 if (cma_wsize) {
+//                     puts("ERROR: cma was not flushed before socketfile interface");
+//                 }
+//             } else {
+//                 /* wsize may have increased with previous rfq so assign here */
+//                 cma_wsize = SOCKET_DATA;
+//                 channel = cma_rsize + 2;
+//             }
+//             if (SOCKET_FILE) {
+//                 int outb = SOCKET_DATA;
+//                 fclose(SOCKET_FILE);
+//                 SOCKET_FILE = NULL;
+//                 SOCKET_DATA = 0;
 
-                if (cma_wsize) {
-                    PDEBUG("# 672: cma and sockfile ???\n");
-                }
+//                 if (cma_wsize) {
+//                     PDEBUG("# 672: cma and sockfile ???\n");
+//                 }
 
-                if (sockfiles) {
-#if PGDEBUG
-                    printf("# 675: client:ready -> read(%d) " PGS_OLOCK "->" PGS_OUT"\n", outb);
-#endif
-                    rename(PGS_OLOCK, PGS_OUT);
-                }
-            } else {
-#if PGDEBUG
-                printf("\n# 681: in[%d] out[%d] flushed\n", cma_rsize, cma_wsize);
-#endif
-                SOCKET_DATA = 0;
-            }
+//                 if (sockfiles) {
+// #if PGDEBUG
+//                     printf("# 675: client:ready -> read(%d) " PGS_OLOCK "->" PGS_OUT"\n", outb);
+// #endif
+//                     rename(PGS_OLOCK, PGS_OUT);
+//                 }
+//             } else {
+// #if PGDEBUG
+//                 printf("\n# 681: in[%d] out[%d] flushed\n", cma_rsize, cma_wsize);
+// #endif
+//                 SOCKET_DATA = 0;
+//             }
 
-        } else {
-            cma_wsize = 0;
-            PDEBUG("# 698: no data, send empty ?");
-// TODO: dedup 739
-            if (sockfiles) {
-                fclose(SOCKET_FILE);
-                SOCKET_FILE = NULL;
-                rename(PGS_OLOCK, PGS_OUT);
-            }
-        }
+//         } else {
+//             cma_wsize = 0;
+//             PDEBUG("# 698: no data, send empty ?");
+// // TODO: dedup 739
+//             if (sockfiles) {
+//                 fclose(SOCKET_FILE);
+//                 SOCKET_FILE = NULL;
+//                 rename(PGS_OLOCK, PGS_OUT);
+//             }
+//         }
     } else {
         pg_prompt();
 #if PGDEBUG
@@ -749,15 +779,15 @@ wire_flush:
     }
 return_early:;
     /* always FD CLEANUP */
-    if (fp) {
-        fclose(fp);
-        unlink(PGS_IN);
-    }
+    // if (fp) {
+    //     fclose(fp);
+    //     unlink(PGS_IN);
+    // }
 
 
     // always free kernel buffer !!!
-    cma_rsize = 0;
-    IO[0] = 0;
+    // cma_rsize = 0;
+    // IO[0] = 0;
 
     #undef IO
 

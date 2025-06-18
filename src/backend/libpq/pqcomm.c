@@ -139,6 +139,11 @@ volatile FILE* queryfp = NULL;
 extern int cma_rsize;
 extern bool sockfiles;
 
+typedef ssize_t (*pglite_read_t)(void *buffer, size_t max_length);
+extern pglite_read_t pglite_read;
+
+typedef ssize_t(*pglite_write_t)(void *buffer, size_t length);
+extern pglite_write_t pglite_write;
 
 /*
  * Message status
@@ -929,18 +934,29 @@ pq_recvbuf(void)
 			PqRecvLength = PqRecvPointer = 0;
 	}
 #if defined(__EMSCRIPTEN__) || defined(__wasi__)
-    if (queryfp && querylen) {
-        int got = fread( PqRecvBuffer, 1, PQ_RECV_BUFFER_SIZE - PqRecvPointer, queryfp);
-        querylen -= got;
-        PqRecvLength += got;
-        if (querylen<=0) {
-            PDEBUG("# 931: could close fp early here " __FILE__);
-            queryfp = NULL;
-        }
-        if (got>0)
-    		return 0;
-    }
-    return EOF;
+    // if (queryfp && querylen) {
+    //     int got = fread( PqRecvBuffer, 1, PQ_RECV_BUFFER_SIZE - PqRecvPointer, queryfp);
+    //     querylen -= got;
+    //     PqRecvLength += got;
+    //     if (querylen<=0) {
+    //         PDEBUG("# 931: could close fp early here " __FILE__);
+    //         queryfp = NULL;
+    //     }
+    //     if (got>0)
+    // 		return 0;
+    // }
+    // return EOF;
+
+	int bytesRead = pglite_read(PqRecvBuffer, PQ_RECV_BUFFER_SIZE - PqRecvPointer);
+	if (bytesRead > 0) {
+		PqRecvLength += bytesRead;
+		return 0;
+	}
+	if (bytesRead < 0) {
+		// unhandled atm
+		return EOF;
+	}
+	return EOF;
 #endif
 
 	/* Ensure that we're in blocking mode */
@@ -1205,21 +1221,25 @@ pq_startmsgread(void)
 				 errmsg("terminating connection because protocol synchronization was lost")));
 #if defined(__EMSCRIPTEN__) || defined(__wasi__)
     if (!pq_buffer_remaining_data()) {
-        if (sockfiles) {
-            PqRecvBuffer = &PqRecvBuffer_static[0];
-            if (PqSendBuffer_save)
-                PqSendBuffer=PqSendBuffer_save;
-            PqSendBufferSize = PQ_SEND_BUFFER_SIZE;
-        } else {
-            PqRecvPointer = 0;
-            PqRecvLength = cma_rsize;
-            PqRecvBuffer = (char*)0x1;
+        // if (sockfiles) {
+        //     PqRecvBuffer = &PqRecvBuffer_static[0];
+        //     if (PqSendBuffer_save)
+        //         PqSendBuffer=PqSendBuffer_save;
+        //     PqSendBufferSize = PQ_SEND_BUFFER_SIZE;
+        // } else {
+        //     PqRecvPointer = 0;
+        //     PqRecvLength = cma_rsize;
+        //     PqRecvBuffer = (char*)0x1;
 
-            PqSendPointer = 0;
-            PqSendBuffer_save = PqSendBuffer;
-            PqSendBuffer = 2 + (char*)(cma_rsize);
-            PqSendBufferSize = (CMA_MB*1024*1024) - (int)(&PqSendBuffer[0]);
-        }
+        //     PqSendPointer = 0;
+        //     PqSendBuffer_save = PqSendBuffer;
+        //     PqSendBuffer = 2 + (char*)(cma_rsize);
+        //     PqSendBufferSize = (CMA_MB*1024*1024) - (int)(&PqSendBuffer[0]);
+        // }
+		PqRecvBuffer = &PqRecvBuffer_static[0];
+		if (PqSendBuffer_save)
+			PqSendBuffer=PqSendBuffer_save;
+		PqSendBufferSize = PQ_SEND_BUFFER_SIZE;
     }
 #if PDEBUG
         printf("# 1225: pq_startmsgread cma_rsize=%d PqRecvLength=%d buf=%p reply=%p\n", cma_rsize, PqRecvLength, &PqRecvBuffer[0], &PqSendBuffer[0]);
@@ -1349,38 +1369,44 @@ pq_getmessage(StringInfo s, int maxlen)
 	return 0;
 }
 #if defined(__EMSCRIPTEN__) || defined(__wasi__)
-extern FILE* SOCKET_FILE;
-extern int SOCKET_DATA;
+// extern FILE* SOCKET_FILE;
+// extern int SOCKET_DATA;
+// static int
+// internal_putbytes(const char *s, size_t len) {
+//     size_t amount;
+//     if (!sockfiles) {
+// 	    while (len > 0) {
+// 		    /* If buffer is full, then flush it out from cma to file and continue from there */
+// 		    if (PqSendPointer >= PqSendBufferSize) {
+//                 int redirected = fwrite(PqSendBuffer, 1, PqSendPointer, SOCKET_FILE);
+//                 sockfiles = true;
+// #if PGDEBUG
+//                 fprintf(stderr, "# 1364: overflow %zu >= %d redirect=%d cma_rsize=%d CMA_MB=%d \n", PqSendPointer, PqSendBufferSize, redirected, cma_rsize, CMA_MB);
+// #endif
+//                 break;
+// 		    }
+// 		    amount = PqSendBufferSize - PqSendPointer;
+// 		    if (amount > len)
+// 			    amount = len;
+// 		    memcpy(PqSendBuffer + PqSendPointer, s, amount);
+// 		    PqSendPointer += amount;
+// 		    s += amount;
+// 		    len -= amount;
+//             SOCKET_DATA+=amount;
+// 	    }
+//     }
+
+//     if (sockfiles) {
+//         int wc=      fwrite(s, 1, len, SOCKET_FILE);
+//         SOCKET_DATA+=wc;
+//     }
+//     return 0;
+// }
+
 static int
 internal_putbytes(const char *s, size_t len) {
-    size_t amount;
-    if (!sockfiles) {
-	    while (len > 0) {
-		    /* If buffer is full, then flush it out from cma to file and continue from there */
-		    if (PqSendPointer >= PqSendBufferSize) {
-                int redirected = fwrite(PqSendBuffer, 1, PqSendPointer, SOCKET_FILE);
-                sockfiles = true;
-#if PGDEBUG
-                fprintf(stderr, "# 1364: overflow %zu >= %d redirect=%d cma_rsize=%d CMA_MB=%d \n", PqSendPointer, PqSendBufferSize, redirected, cma_rsize, CMA_MB);
-#endif
-                break;
-		    }
-		    amount = PqSendBufferSize - PqSendPointer;
-		    if (amount > len)
-			    amount = len;
-		    memcpy(PqSendBuffer + PqSendPointer, s, amount);
-		    PqSendPointer += amount;
-		    s += amount;
-		    len -= amount;
-            SOCKET_DATA+=amount;
-	    }
-    }
-
-    if (sockfiles) {
-        int wc=      fwrite(s, 1, len, SOCKET_FILE);
-        SOCKET_DATA+=wc;
-    }
-    return 0;
+	pglite_write(s, len);
+	return 0;
 }
 
 static int
