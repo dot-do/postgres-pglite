@@ -1,5 +1,7 @@
 close
 fcntl
+fgets
+fputs
 free
 getpid
 gettimeofday

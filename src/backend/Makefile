@@ -93,7 +93,10 @@ pglite-exported-functions:
 	> '/install/pglite/exported_functions.txt'
 
 pglite: $(OBJS)
-	$(CC) $(CFLAGS) $(call expand_subsys,$^) $(LDFLAGS) $(LIBS) $(POSTGRES_PGLITE_FLAGS) -o $@$(X)	
+	$(CC) $(CFLAGS) $(call expand_subsys,$^) $(LDFLAGS) $(LIBS) $(POSTGRES_PGLITE_FLAGS) -o $@$(X)
+
+pglite-libc:
+	$(CC) $(CFLAGS) 
 
 endif
 

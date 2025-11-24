@@ -7,7 +7,7 @@ docker run $@ \
   -e DEBUG=${DEBUG:-false} \
   --workdir=${DOCKER_WORKSPACE} \
   -v .:${DOCKER_WORKSPACE}:rw \
-  -v ./dist:/tmp/pglite:rw \
+  -v ./dist:/pglite:rw \
   electricsql/pglite-builder:3.1.74_2 \
   ./build-pglite.sh
   

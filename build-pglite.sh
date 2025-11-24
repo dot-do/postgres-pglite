@@ -5,9 +5,9 @@
 #############
 
 # final output folder
-INSTALL_FOLDER=${INSTALL_FOLDER:-"/tmp/pglite"}
+INSTALL_FOLDER=${INSTALL_FOLDER:-"/pglite"}
 
-PGLITE_BASE_CFLAGS="-D__PGLITE__ -DPG_PREFIX=/tmp/pglite"
+PGLITE_BASE_CFLAGS="-D__PGLITE__ -Dfgets=pgl_fgets -Dsystem=pgl_system -Dpopen=pgl_popen -Dpclose=pgl_pclose -Dgeteuid=pgl_geteuid"
 
 # build with optimizations by default aka release
 PGLITE_CFLAGS="$PGLITE_BASE_CFLAGS -O2"
@@ -39,7 +39,7 @@ else
     echo "$CONFIG_STATUS exists and is newer than $REF_FILE. ./configure will NOT be run."
 fi
 
-PGLITE_LDFLAGS="-sWASM_BIGINT -sUSE_PTHREADS=0"
+PGLITE_LDFLAGS="-sWASM_BIGINT -sUSE_PTHREADS=0 $(pwd)/pglite/src/pglitec/pglitec.o"
 PGLITE_LDFLAGS_SL="-shared -sSIDE_MODULE=1 -Wno-unused-function"
 
 # we define here "all" emscripten flags in order to allow native builds (like libpglite)
@@ -62,7 +62,7 @@ if [ "$RUN_CONFIGURE" = true ]; then
     LDFLAGS=$PGLITE_LDFLAGS \
     LDFLAGS_SL=$PGLITE_LDFLAGS_SL \
     LDFLAGS_EX=$PGLITE_LDFLAGS_EX \
-    CFLAGS="${PGLITE_CFLAGS} -sWASM_BIGINT -fpic -sENVIRONMENT=node,web,worker -sSUPPORT_LONGJMP=emscripten -Wno-declaration-after-statement -Wno-macro-redefined -Wno-unused-function -Wno-missing-prototypes -Wno-incompatible-pointer-types" emconfigure ./configure ac_cv_exeext=.js --host aarch64-unknown-linux-gnu --disable-spinlocks --disable-largefile --without-llvm  --without-pam --with-openssl=no --without-readline --without-icu --with-includes=$INSTALL_PREFIX/include:$INSTALL_PREFIX/include/libxml2:$(pwd)/pglite/src/include --with-libraries=$INSTALL_PREFIX/lib --with-uuid=ossp --with-zlib --with-libxml --with-libxslt --with-template=emscripten --prefix=$INSTALL_FOLDER || { echo 'error: emconfigure failed' ; exit 11; }
+    CFLAGS="${PGLITE_CFLAGS} -sWASM_BIGINT -fpic -sENVIRONMENT=node,web,worker -sSUPPORT_LONGJMP=emscripten -Wno-declaration-after-statement -Wno-macro-redefined -Wno-unused-function -Wno-missing-prototypes -Wno-incompatible-pointer-types" emconfigure ./configure ac_cv_exeext=.js --host aarch64-unknown-linux-gnu --disable-spinlocks --disable-largefile --without-llvm  --without-pam --with-openssl=no --without-readline --without-icu --with-includes=$INSTALL_PREFIX/include:$INSTALL_PREFIX/include/libxml2:$(pwd)/pglite/src/include --with-libraries=$INSTALL_PREFIX/lib:$(pwd)/pglite/src/pglite-libc --with-uuid=ossp --with-zlib --with-libxml --with-libxslt --with-template=emscripten --prefix=$INSTALL_FOLDER || { echo 'error: emconfigure failed' ; exit 11; }
 else
     echo "Warning: configure has not been run because RUN_CONFIGURE=${RUN_CONFIGURE}"
 fi
@@ -88,16 +88,16 @@ PATH=$SAVE_PATH
 emmake make PORTNAME=emscripten -j -C src/backend pglite-exported-functions || { echo 'emmake make PORTNAME=emscripten -j -C src/backend pglite-exported-functions' ; exit 51; }
 
 # Step 6: make and install pglite
-PGROOT=/tmp/pglite
-PG_IMPORTS_DIR=$PGROOT/imports
+PGROOT=/pglite
+# PG_IMPORTS_DIR=$PGROOT/imports
 PGPRELOAD="\
 --preload-file $(pwd)/pglite/static/PGPASSFILE@/home/web_user/.pgpass \
---preload-file $(pwd)/pglite/static/empty@/tmp/pglite/bin/initdb \
---preload-file $(pwd)/pglite/static/empty@/tmp/pglite/bin/pg_dump \
---preload-file $(pwd)/pglite/static/empty@/tmp/pglite/bin/postgres \
---preload-file $PGROOT/share/postgresql@/tmp/pglite/share/postgresql \
---preload-file $PGROOT/lib/postgresql@/tmp/pglite/lib/postgresql \
---preload-file $(pwd)/pglite/static/password@/tmp/pglite/password"
+--preload-file $(pwd)/pglite/static/empty@/pglite/bin/initdb \
+--preload-file $(pwd)/pglite/static/empty@/pglite/bin/pg_dump \
+--preload-file $(pwd)/pglite/static/empty@/pglite/bin/postgres \
+--preload-file $PGROOT/share/postgresql@/pglite/share/postgresql \
+--preload-file $PGROOT/lib/postgresql@/pglite/lib/postgresql \
+--preload-file $(pwd)/pglite/static/password@/pglite/password"
 PGLITE_EXPORTED_RUNTIME_METHODS="MEMFS,IDBFS,FS,setValue,getValue,UTF8ToString,stringToNewUTF8,stringToUTF8OnStack,addFunction,removeFunction,callMain,ENV"
 
 # -sDYLINK_DEBUG=2 use this for debugging missing exported symbols (ex when an extension calls a pgcore function that hasn't been exported)
