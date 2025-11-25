@@ -1,5 +1,8 @@
 #include <unistd.h>
 #include <stdio.h>
+#include <sys/shm.h>
+#include <errno.h>
+#include <time.h>
 
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/emscripten.h>
@@ -56,24 +59,26 @@ pgl_pclose(FILE* fd) {
     return pclose(fd);
 }
 
+
+
+#define PGL_ERR_NO_ERROR    0
+#define PGL_ERR_NOT_HANDLED 1
+
+static int pgl_errno = PGL_ERR_NO_ERROR;
+
+int EMSCRIPTEN_KEEPALIVE
+pgl_set_errno(int x) {
+    int curr = pgl_errno;
+    pgl_errno = x;
+    return curr;
+}
+
 typedef char* (*pglite_fgets_t)(char * restrict str, int size, FILE * restrict stream);
 pglite_fgets_t pglite_fgets = NULL;
 
 void EMSCRIPTEN_KEEPALIVE
 pgl_set_fgets_fn(pglite_fgets_t fgets_fn) {
     pglite_fgets = fgets_fn;
-}
-
-#define PGL_ERR_NO_ERROR    0
-#define PGL_ERR_NOT_HANDLED 1
-volatile EMSCRIPTEN_KEEPALIVE 
-int pgl_errno = PGL_ERR_NO_ERROR;
-
-int EMSCRIPTEN_KEEPALIVE
-pgl_set_errno(int errno) {
-    int curr = pgl_errno;
-    pgl_errno = errno;
-    return curr;
 }
 
 char* EMSCRIPTEN_KEEPALIVE
@@ -88,9 +93,171 @@ pgl_fgets(char * restrict str, int size, FILE * restrict stream) {
     return fgets(str, size, stream);
 }
 
+// typedef char* (*pglite_fputs_t)(const char * s, FILE * stream);
+// pglite_fputs_t pglite_fputs = NULL;
+
+// void EMSCRIPTEN_KEEPALIVE
+// pgl_set_fputs_fn(pglite_fputs_t fputs_fn) {
+//     pglite_fputs = fputs_fn;
+// }
+
+// int EMSCRIPTEN_KEEPALIVE
+// fputs(const char *s, FILE *stream) {
+//     if (pglite_fputs) {
+//         pgl_errno = PGL_ERR_NO_ERROR;
+//         char *ret = pglite_fputs(s, stream);
+//         if (pgl_errno == PGL_ERR_NO_ERROR) {
+//             return ret;
+//         }
+//     }
+//     return fputs(s, stream);
+// }
+
+#define PGLITE_UID 123
+
 uid_t EMSCRIPTEN_KEEPALIVE
 pgl_geteuid(void) {
-    return 1234;   // your custom value
+    return PGLITE_UID;
 }
 
+uid_t EMSCRIPTEN_KEEPALIVE
+pgl_getuid(void) {
+    return PGLITE_UID;
+}
 
+void EMSCRIPTEN_KEEPALIVE
+pgl_exit(int status) {
+    if (status) {
+        exit(status);
+    }
+    exit(status);
+}
+
+// ============ SHM ===============
+
+typedef struct ShmSegment {
+    int shmid;
+    key_t key;
+    size_t size;
+    void *addr;
+    int shmflg;
+    struct ShmSegment *next;
+} ShmSegment;
+
+static ShmSegment *shm_list = NULL;
+static unsigned int next_shmid = 1;
+
+// shmget replacement
+int EMSCRIPTEN_KEEPALIVE
+shmget(key_t key, size_t size, int shmflg) {
+    ShmSegment *seg = shm_list;
+
+    // Search for existing segment
+    while (seg) {
+        if (seg->key == key) return (int)(uintptr_t)seg->addr;
+        seg = seg->next;
+    }
+
+    // If IPC_CREAT is set, create new segment
+    if (shmflg & IPC_CREAT) {
+        void *mem = malloc(size);
+        if (!mem) {
+            errno = ENOMEM;
+            return -1;
+        }
+
+        ShmSegment *new_seg = malloc(sizeof(ShmSegment));
+        if (!new_seg) {
+            free(mem);
+            errno = ENOMEM;
+            return -1;
+        }
+
+        new_seg->shmid = next_shmid++;
+        new_seg->key = key;
+        new_seg->size = size;
+        new_seg->addr = mem;
+        new_seg->shmflg = shmflg;
+        new_seg->next = shm_list;
+        shm_list = new_seg;
+
+        return new_seg->shmid;
+    }
+
+    errno = ENOENT;
+    return -1;
+}
+
+// shmat replacement
+void EMSCRIPTEN_KEEPALIVE
+*shmat(int shmid, const void *shmaddr, int shmflg) {
+    ShmSegment *seg = shm_list;
+
+    while (seg) {
+        if ((int)(uintptr_t)seg->shmid == shmid) {
+            return seg->addr;
+        }
+        seg = seg->next;
+    }
+
+    errno = EINVAL;
+    return (void *)-1;
+}
+
+// shmdt replacement
+int EMSCRIPTEN_KEEPALIVE
+shmdt(const void *shmaddr) {
+    ShmSegment *seg = shm_list;
+    ShmSegment *prev = NULL;
+
+    while (seg) {
+        if (seg->addr == shmaddr) {
+            free(seg->addr);
+            if (prev) prev->next = seg->next;
+            else shm_list = seg->next;
+            free(seg);
+            return 0;
+        }
+        prev = seg;
+        seg = seg->next;
+    }
+
+    errno = EINVAL;
+    return -1;
+}
+
+// shmctl replacement
+int EMSCRIPTEN_KEEPALIVE
+shmctl(int shmid, int cmd, struct shmid_ds *buf) {
+    ShmSegment *seg = shm_list;
+    ShmSegment *prev = NULL;
+
+    while (seg) {
+        if ((int)(uintptr_t)seg->shmid == shmid) {
+            if (cmd == IPC_RMID) {
+                free(seg->addr);
+                if (prev) prev->next = seg->next;
+                else shm_list = seg->next;
+                free(seg);
+                return 0;
+            } else if (cmd == IPC_STAT && buf != NULL) {
+                buf->shm_segsz = seg->size;
+                buf->shm_perm.__key = seg->key;
+                buf->shm_nattch = 1; // single-process emulation
+                buf->shm_atime = buf->shm_dtime = buf->shm_ctime = time(NULL);
+                return 0;
+            } else if (cmd == IPC_SET && buf != NULL) {
+                seg->size = buf->shm_segsz;
+                return 0;
+            } else {
+                errno = EINVAL;
+                return -1;
+            }
+        }
+        prev = seg;
+        seg = seg->next;
+    }
+
+    errno = EINVAL;
+    return -1;
+}

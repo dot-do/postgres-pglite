@@ -4,10 +4,14 @@
 # $INSTALL_PREFIX is expected to point to the installation folder of various libraries built to wasm (see pglite-builder)
 #############
 
+# first build pglite-libc object WITHOUT the overriding flags
+# pushd pglite/src/pglitec && emcc -g --no-wasm-opt -gsource-map -static -fPIC -o pglitec.o -c pglitec.c && popd
+pushd pglite/src/pglitec && emcc -static -fPIC -o pglitec.o -c pglitec.c && popd
+
 # final output folder
 INSTALL_FOLDER=${INSTALL_FOLDER:-"/pglite"}
 
-PGLITE_BASE_CFLAGS="-D__PGLITE__ -Dfgets=pgl_fgets -Dsystem=pgl_system -Dpopen=pgl_popen -Dpclose=pgl_pclose -Dgeteuid=pgl_geteuid"
+PGLITE_BASE_CFLAGS="-D__PGLITE__ -Dfgets=pgl_fgets -Dsystem=pgl_system -Dpopen=pgl_popen -Dpclose=pgl_pclose -Dgeteuid=pgl_geteuid -Dgetuid=pgl_getuid -Dexit=pgl_exit"
 
 # build with optimizations by default aka release
 PGLITE_CFLAGS="$PGLITE_BASE_CFLAGS -O2"
@@ -39,7 +43,7 @@ else
     echo "$CONFIG_STATUS exists and is newer than $REF_FILE. ./configure will NOT be run."
 fi
 
-PGLITE_LDFLAGS="-sWASM_BIGINT -sUSE_PTHREADS=0 $(pwd)/pglite/src/pglitec/pglitec.o"
+PGLITE_LDFLAGS="-sWASM_BIGINT -sUSE_PTHREADS=0"
 PGLITE_LDFLAGS_SL="-shared -sSIDE_MODULE=1 -Wno-unused-function"
 
 # we define here "all" emscripten flags in order to allow native builds (like libpglite)
@@ -55,6 +59,7 @@ PGLITE_LDFLAGS_EX="-sWASM_BIGINT \
 -sTOTAL_MEMORY=32MB \
 -sINVOKE_RUN=0 \
 -sEXPORTED_FUNCTIONS=_main \
+$(pwd)/pglite/src/pglitec/pglitec.o \
 -lproxyfs.js"
 
 # Step 1: configure the project
