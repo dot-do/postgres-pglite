@@ -4,6 +4,8 @@
 # $INSTALL_PREFIX is expected to point to the installation folder of various libraries built to wasm (see pglite-builder)
 #############
 
+emcc --clear-cache
+
 # first build pglite-libc object WITHOUT the overriding flags
 # pushd pglite/src/pglitec && emcc -g --no-wasm-opt -gsource-map -static -fPIC -o pglitec.o -c pglitec.c && popd
 pushd pglite/src/pglitec && emcc -static -fPIC -o pglitec.o -c pglitec.c && popd
@@ -11,7 +13,8 @@ pushd pglite/src/pglitec && emcc -static -fPIC -o pglitec.o -c pglitec.c && popd
 # final output folder
 INSTALL_FOLDER=${INSTALL_FOLDER:-"/pglite"}
 
-PGLITE_BASE_CFLAGS="-D__PGLITE__ -Dfgets=pgl_fgets -Dsystem=pgl_system -Dpopen=pgl_popen -Dpclose=pgl_pclose -Dgeteuid=pgl_geteuid -Dgetuid=pgl_getuid -Dexit=pgl_exit"
+# -Dread=pgl_read -Dwrite=pgl_write
+PGLITE_BASE_CFLAGS="-D__PGLITE__ -Dfputs=pgl_fputs -Dfgets=pgl_fgets -Dsystem=pgl_system -Dpopen=pgl_popen -Dpclose=pgl_pclose -Dgeteuid=pgl_geteuid -Dgetuid=pgl_getuid -Dexit=pgl_exit"
 
 # build with optimizations by default aka release
 PGLITE_CFLAGS="$PGLITE_BASE_CFLAGS -O2"
@@ -58,7 +61,7 @@ PGLITE_LDFLAGS_EX="-sWASM_BIGINT \
 -sEXPORTED_RUNTIME_METHODS=$EXPORTED_RUNTIME_METHODS \
 -sTOTAL_MEMORY=32MB \
 -sINVOKE_RUN=0 \
--sEXPORTED_FUNCTIONS=_main \
+-sEXPORTED_FUNCTIONS=_main,_fgets,_fputs,_pclose \
 $(pwd)/pglite/src/pglitec/pglitec.o \
 -lproxyfs.js"
 

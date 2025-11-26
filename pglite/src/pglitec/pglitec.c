@@ -43,7 +43,7 @@ pgl_popen(const char *command, const char *mode) {
     return popen(command, mode);
 }
 
-typedef int (*pglite_pclose_t)(const FILE* fd);
+typedef int (*pglite_pclose_t)(FILE* stream);
 pglite_pclose_t pglite_pclose = NULL;
 
 void EMSCRIPTEN_KEEPALIVE
@@ -52,26 +52,60 @@ pgl_set_pclose_fn(pglite_pclose_t pclose_fn) {
 }
 
 int EMSCRIPTEN_KEEPALIVE
-pgl_pclose(FILE* fd) {
+pgl_pclose(FILE* stream) {
     if (pglite_pclose) {
-        return pglite_pclose(fd);
+        return pglite_pclose(stream);
     }
-    return pclose(fd);
+    return pclose(stream);
 }
 
+// typedef ssize_t (*pglite_write_t)(int fd, const void *buf, size_t count);
+// pglite_write_t pglite_write_fn = NULL;
 
+// ssize_t EMSCRIPTEN_KEEPALIVE
+// pgl_write(int fd, const void *buf, size_t count) {
+//     if (pglite_write_fn) {
+//         return pglite_write_fn(fd, buf, count);
+//     }
+//     return write(fd, buf, count);
+// }
 
-#define PGL_ERR_NO_ERROR    0
-#define PGL_ERR_NOT_HANDLED 1
+// pglite_write_t EMSCRIPTEN_KEEPALIVE
+// pgl_set_write_fn(pglite_write_t fn) {
+//     pglite_write_t prev = pglite_write_fn;
+//     pglite_write_fn = fn;
+//     return prev;
+// }
 
-static int pgl_errno = PGL_ERR_NO_ERROR;
+// typedef ssize_t (*pglite_read_t)(int fd, const void *buf, size_t count);
+// pglite_read_t pglite_read_fn = NULL;
 
-int EMSCRIPTEN_KEEPALIVE
-pgl_set_errno(int x) {
-    int curr = pgl_errno;
-    pgl_errno = x;
-    return curr;
-}
+// ssize_t EMSCRIPTEN_KEEPALIVE
+// pgl_read(int fd, void *buf, size_t count) {
+//     if (pglite_read_fn) {
+//         return pglite_read_fn(fd, buf, count);
+//     }
+//     return read(fd, buf, count);
+// }
+
+// pglite_read_t EMSCRIPTEN_KEEPALIVE
+// pgl_set_read_fn(pglite_read_t fn) {
+//     pglite_read_t prev = pglite_read_fn;
+//     pglite_read_fn = fn;
+//     return prev;
+// }
+
+// #define PGL_ERR_NO_ERROR    0
+// #define PGL_ERR_NOT_HANDLED 1
+
+// static int pgl_errno = PGL_ERR_NO_ERROR;
+
+// int EMSCRIPTEN_KEEPALIVE
+// pgl_set_errno(int x) {
+//     int curr = pgl_errno;
+//     pgl_errno = x;
+//     return curr;
+// }
 
 typedef char* (*pglite_fgets_t)(char * restrict str, int size, FILE * restrict stream);
 pglite_fgets_t pglite_fgets = NULL;
@@ -84,34 +118,35 @@ pgl_set_fgets_fn(pglite_fgets_t fgets_fn) {
 char* EMSCRIPTEN_KEEPALIVE
 pgl_fgets(char * restrict str, int size, FILE * restrict stream) {
     if (pglite_fgets) {
-        pgl_errno = PGL_ERR_NO_ERROR;
-        char *ret = pglite_fgets(str, size, stream);
-        if (pgl_errno == PGL_ERR_NO_ERROR) {
-            return ret;
-        }
+        // pgl_errno = PGL_ERR_NO_ERROR;
+        return pglite_fgets(str, size, stream);
+        // if (pgl_errno == PGL_ERR_NO_ERROR) {
+        //     return ret;
+        // }
     }
+    // should throw
     return fgets(str, size, stream);
 }
 
-// typedef char* (*pglite_fputs_t)(const char * s, FILE * stream);
-// pglite_fputs_t pglite_fputs = NULL;
+typedef int (*pglite_fputs_t)(const char * s, FILE * stream);
+pglite_fputs_t pglite_fputs = NULL;
 
-// void EMSCRIPTEN_KEEPALIVE
-// pgl_set_fputs_fn(pglite_fputs_t fputs_fn) {
-//     pglite_fputs = fputs_fn;
-// }
+void EMSCRIPTEN_KEEPALIVE
+pgl_set_fputs_fn(pglite_fputs_t fputs_fn) {
+    pglite_fputs = fputs_fn;
+}
 
-// int EMSCRIPTEN_KEEPALIVE
-// fputs(const char *s, FILE *stream) {
-//     if (pglite_fputs) {
-//         pgl_errno = PGL_ERR_NO_ERROR;
-//         char *ret = pglite_fputs(s, stream);
-//         if (pgl_errno == PGL_ERR_NO_ERROR) {
-//             return ret;
-//         }
-//     }
-//     return fputs(s, stream);
-// }
+int EMSCRIPTEN_KEEPALIVE
+pgl_fputs(const char *s, FILE *stream) {
+    if (pglite_fputs) {
+        // pgl_errno = PGL_ERR_NO_ERROR;
+        return pglite_fputs(s, stream);
+        // if (pgl_errno == PGL_ERR_NO_ERROR) {
+        //     return ret;
+        // }
+    }
+    return fputs(s, stream);
+}
 
 #define PGLITE_UID 123
 
@@ -127,6 +162,7 @@ pgl_getuid(void) {
 
 void EMSCRIPTEN_KEEPALIVE
 pgl_exit(int status) {
+    optind = 1;
     if (status) {
         exit(status);
     }
