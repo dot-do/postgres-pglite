@@ -59,54 +59,6 @@ pgl_pclose(FILE* stream) {
     return pclose(stream);
 }
 
-// typedef ssize_t (*pglite_write_t)(int fd, const void *buf, size_t count);
-// pglite_write_t pglite_write_fn = NULL;
-
-// ssize_t EMSCRIPTEN_KEEPALIVE
-// pgl_write(int fd, const void *buf, size_t count) {
-//     if (pglite_write_fn) {
-//         return pglite_write_fn(fd, buf, count);
-//     }
-//     return write(fd, buf, count);
-// }
-
-// pglite_write_t EMSCRIPTEN_KEEPALIVE
-// pgl_set_write_fn(pglite_write_t fn) {
-//     pglite_write_t prev = pglite_write_fn;
-//     pglite_write_fn = fn;
-//     return prev;
-// }
-
-// typedef ssize_t (*pglite_read_t)(int fd, const void *buf, size_t count);
-// pglite_read_t pglite_read_fn = NULL;
-
-// ssize_t EMSCRIPTEN_KEEPALIVE
-// pgl_read(int fd, void *buf, size_t count) {
-//     if (pglite_read_fn) {
-//         return pglite_read_fn(fd, buf, count);
-//     }
-//     return read(fd, buf, count);
-// }
-
-// pglite_read_t EMSCRIPTEN_KEEPALIVE
-// pgl_set_read_fn(pglite_read_t fn) {
-//     pglite_read_t prev = pglite_read_fn;
-//     pglite_read_fn = fn;
-//     return prev;
-// }
-
-// #define PGL_ERR_NO_ERROR    0
-// #define PGL_ERR_NOT_HANDLED 1
-
-// static int pgl_errno = PGL_ERR_NO_ERROR;
-
-// int EMSCRIPTEN_KEEPALIVE
-// pgl_set_errno(int x) {
-//     int curr = pgl_errno;
-//     pgl_errno = x;
-//     return curr;
-// }
-
 typedef char* (*pglite_fgets_t)(char * restrict str, int size, FILE * restrict stream);
 pglite_fgets_t pglite_fgets = NULL;
 
@@ -230,7 +182,7 @@ void EMSCRIPTEN_KEEPALIVE
     ShmSegment *seg = shm_list;
 
     while (seg) {
-        if ((int)(uintptr_t)seg->shmid == shmid) {
+        if (seg->shmid == shmid) {
             return seg->addr;
         }
         seg = seg->next;
@@ -269,7 +221,7 @@ shmctl(int shmid, int cmd, struct shmid_ds *buf) {
     ShmSegment *prev = NULL;
 
     while (seg) {
-        if ((int)(uintptr_t)seg->shmid == shmid) {
+        if (seg->shmid == shmid) {
             if (cmd == IPC_RMID) {
                 free(seg->addr);
                 if (prev) prev->next = seg->next;
@@ -279,7 +231,7 @@ shmctl(int shmid, int cmd, struct shmid_ds *buf) {
             } else if (cmd == IPC_STAT && buf != NULL) {
                 buf->shm_segsz = seg->size;
                 buf->shm_perm.__key = seg->key;
-                buf->shm_nattch = 1; // single-process emulation
+                buf->shm_nattch = 0;
                 buf->shm_atime = buf->shm_dtime = buf->shm_ctime = time(NULL);
                 return 0;
             } else if (cmd == IPC_SET && buf != NULL) {
@@ -297,3 +249,51 @@ shmctl(int shmid, int cmd, struct shmid_ds *buf) {
     errno = EINVAL;
     return -1;
 }
+
+// typedef ssize_t (*pglite_write_t)(int fd, const void *buf, size_t count);
+// pglite_write_t pglite_write_fn = NULL;
+
+// ssize_t EMSCRIPTEN_KEEPALIVE
+// pgl_write(int fd, const void *buf, size_t count) {
+//     if (pglite_write_fn) {
+//         return pglite_write_fn(fd, buf, count);
+//     }
+//     return write(fd, buf, count);
+// }
+
+// pglite_write_t EMSCRIPTEN_KEEPALIVE
+// pgl_set_write_fn(pglite_write_t fn) {
+//     pglite_write_t prev = pglite_write_fn;
+//     pglite_write_fn = fn;
+//     return prev;
+// }
+
+// typedef ssize_t (*pglite_read_t)(int fd, const void *buf, size_t count);
+// pglite_read_t pglite_read_fn = NULL;
+
+// ssize_t EMSCRIPTEN_KEEPALIVE
+// pgl_read(int fd, void *buf, size_t count) {
+//     if (pglite_read_fn) {
+//         return pglite_read_fn(fd, buf, count);
+//     }
+//     return read(fd, buf, count);
+// }
+
+// pglite_read_t EMSCRIPTEN_KEEPALIVE
+// pgl_set_read_fn(pglite_read_t fn) {
+//     pglite_read_t prev = pglite_read_fn;
+//     pglite_read_fn = fn;
+//     return prev;
+// }
+
+// #define PGL_ERR_NO_ERROR    0
+// #define PGL_ERR_NOT_HANDLED 1
+
+// static int pgl_errno = PGL_ERR_NO_ERROR;
+
+// int EMSCRIPTEN_KEEPALIVE
+// pgl_set_errno(int x) {
+//     int curr = pgl_errno;
+//     pgl_errno = x;
+//     return curr;
+// }

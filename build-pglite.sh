@@ -8,7 +8,7 @@ emcc --clear-cache
 
 # first build pglite-libc object WITHOUT the overriding flags
 # pushd pglite/src/pglitec && emcc -g --no-wasm-opt -gsource-map -static -fPIC -o pglitec.o -c pglitec.c && popd
-pushd pglite/src/pglitec && emcc -static -fPIC -o pglitec.o -c pglitec.c && popd
+pushd pglite/src/pglitec && emcc -g --no-wasm-opt -gsource-map -static -fPIC -o pglitec.o -c pglitec.c && popd
 
 # final output folder
 INSTALL_FOLDER=${INSTALL_FOLDER:-"/pglite"}
@@ -50,7 +50,7 @@ PGLITE_LDFLAGS="-sWASM_BIGINT -sUSE_PTHREADS=0"
 PGLITE_LDFLAGS_SL="-shared -sSIDE_MODULE=1 -Wno-unused-function"
 
 # we define here "all" emscripten flags in order to allow native builds (like libpglite)
-EXPORTED_RUNTIME_METHODS="addFunction,removeFunction,FS,MEMFS,PROXYFS,callMain,ENV"
+EXPORTED_RUNTIME_METHODS="addFunction,removeFunction,FS,MEMFS,PROXYFS,callMain,ENV,UTF8ToString,stringToNewUTF8,allocateUTF8"
 PGLITE_LDFLAGS_EX="-sWASM_BIGINT \
 -sSUPPORT_LONGJMP=emscripten \
 -sFORCE_FILESYSTEM=1 \
@@ -61,7 +61,7 @@ PGLITE_LDFLAGS_EX="-sWASM_BIGINT \
 -sEXPORTED_RUNTIME_METHODS=$EXPORTED_RUNTIME_METHODS \
 -sTOTAL_MEMORY=32MB \
 -sINVOKE_RUN=0 \
--sEXPORTED_FUNCTIONS=_main,_fgets,_fputs,_pclose \
+-sEXPORTED_FUNCTIONS=_main,_fgets,_fputs,_pclose,_fopen,_fclose,___errno_location,_strerror \
 $(pwd)/pglite/src/pglitec/pglitec.o \
 -lproxyfs.js"
 
