@@ -6,27 +6,35 @@
 
 emcc --clear-cache
 
-# first build pglite-libc object WITHOUT the overriding flags
-# pushd pglite/src/pglitec && emcc -g --no-wasm-opt -gsource-map -static -fPIC -o pglitec.o -c pglitec.c && popd
-pushd pglite/src/pglitec && emcc -g --no-wasm-opt -gsource-map -static -fPIC -o pglitec.o -c pglitec.c && popd
-
 # final output folder
 INSTALL_FOLDER=${INSTALL_FOLDER:-"/pglite"}
 
-# -Dread=pgl_read -Dwrite=pgl_write
-PGLITE_BASE_CFLAGS="-D__PGLITE__ -Dfputs=pgl_fputs -Dfgets=pgl_fgets -Dsystem=pgl_system -Dpopen=pgl_popen -Dpclose=pgl_pclose -Dgeteuid=pgl_geteuid -Dgetuid=pgl_getuid -Dexit=pgl_exit"
-
 # build with optimizations by default aka release
-PGLITE_CFLAGS="$PGLITE_BASE_CFLAGS -O2"
+PGLITE_CFLAGS="-O2"
 if [ "$DEBUG" = true ]
 then
     echo "pglite: building debug version."
-    PGLITE_CFLAGS="$PGLITE_BASE_CFLAGS -g -gsource-map --no-wasm-opt"
+    PGLITE_CFLAGS="-g -gsource-map --no-wasm-opt"
 else
     echo "pglite: building release version."
+    PGLITE_CFLAGS="-O2"
     # we shouldn't need to do this, but there's a bug somewhere that prevents a successful build if this is set
     unset DEBUG
 fi
+
+# PGLITE_OTHER_FLAGS="-sUSE_PTHREADS=0 -fPIC -m32 -mno-bulk-memory -mnontrapping-fptoint -mno-reference-types -mno-sign-ext -mno-extended-const -mno-atomics -mno-tail-call -mno-multivalue -mno-relaxed-simd -mno-simd128 -mno-multimemory -mno-exception-handling -Wno-unused-command-line-argument -Wno-unreachable-code-fallthrough -Wno-unused-function -Wno-invalid-noreturn -Wno-declaration-after-statement -Wno-invalid-noreturn"
+PGLITE_CFLAGS="$PGLITE_CFLAGS -m32"
+
+# first build pglite-libc object WITHOUT the overriding flags
+# pushd pglite/src/pglitec && emcc -g --no-wasm-opt -gsource-map -static -fPIC -o pglitec.o -c pglitec.c && popd
+pushd pglite/src/pglitec && emcc $PGLITE_CFLAGS -static -fpic -o pglitec.o -c pglitec.c && popd
+
+# -Dread=pgl_read -Dwrite=pgl_write
+PGLITE_CFLAGS="$PGLITE_CFLAGS \
+-D__PGLITE__ \
+-Dsystem=pgl_system -Dpopen=pgl_popen -Dpclose=pgl_pclose \
+-Dgeteuid=pgl_geteuid -Dgetuid=pgl_getuid -Dgetpwuid=pgl_getpwuid \
+-Dexit=pgl_exit"
 
 echo "pglite: PGLITE_CFLAGS=$PGLITE_CFLAGS"
 
@@ -50,11 +58,13 @@ PGLITE_LDFLAGS="-sWASM_BIGINT -sUSE_PTHREADS=0"
 PGLITE_LDFLAGS_SL="-shared -sSIDE_MODULE=1 -Wno-unused-function"
 
 # we define here "all" emscripten flags in order to allow native builds (like libpglite)
-EXPORTED_RUNTIME_METHODS="addFunction,removeFunction,FS,MEMFS,PROXYFS,callMain,ENV,UTF8ToString,stringToNewUTF8,allocateUTF8"
-PGLITE_LDFLAGS_EX="-sWASM_BIGINT \
+EXPORTED_RUNTIME_METHODS="addFunction,removeFunction,FS,MEMFS,PROXYFS,callMain,ENV,UTF8ToString,stringToNewUTF8,allocateUTF8,allocateUTF8OnStack,stringToUTF8OnStack"
+PGLITE_LDFLAGS_EX="\
+-sWASM_BIGINT \
 -sSUPPORT_LONGJMP=emscripten \
 -sFORCE_FILESYSTEM=1 \
--sNO_EXIT_RUNTIME=1 -sENVIRONMENT=node,web,worker \
+-sUSE_PTHREADS=0 \
+-sNO_EXIT_RUNTIME=0 -sENVIRONMENT=node,web,worker \
 -sMAIN_MODULE=2 -sMODULARIZE=1 -sEXPORT_ES6=1 \
 -sEXPORT_NAME=Module -sALLOW_TABLE_GROWTH -sALLOW_MEMORY_GROWTH \
 -sERROR_ON_UNDEFINED_SYMBOLS=0 \
@@ -106,7 +116,7 @@ PGPRELOAD="\
 --preload-file $PGROOT/share/postgresql@/pglite/share/postgresql \
 --preload-file $PGROOT/lib/postgresql@/pglite/lib/postgresql \
 --preload-file $(pwd)/pglite/static/password@/pglite/password"
-PGLITE_EXPORTED_RUNTIME_METHODS="MEMFS,IDBFS,FS,setValue,getValue,UTF8ToString,stringToNewUTF8,stringToUTF8OnStack,addFunction,removeFunction,callMain,ENV"
+PGLITE_EXPORTED_RUNTIME_METHODS="MEMFS,IDBFS,FS,setValue,getValue,UTF8ToString,stringToNewUTF8,allocateUTF8OnStack,stringToUTF8OnStack,addFunction,removeFunction,callMain,ENV"
 
 # -sDYLINK_DEBUG=2 use this for debugging missing exported symbols (ex when an extension calls a pgcore function that hasn't been exported)
 #WASM_COMPILE_FLAGS="-m32 -mno-bulk-memory -mnontrapping-fptoint -mno-reference-types -mno-sign-ext -mno-extended-const -mno-atomics -mno-tail-call -mno-multivalue -mno-relaxed-simd -mno-simd128 -mno-multimemory -mno-exception-handling"

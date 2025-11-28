@@ -3,6 +3,8 @@
 #include <sys/shm.h>
 #include <errno.h>
 #include <time.h>
+#include <pwd.h>
+#include <sys/types.h>
 
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/emscripten.h>
@@ -59,46 +61,46 @@ pgl_pclose(FILE* stream) {
     return pclose(stream);
 }
 
-typedef char* (*pglite_fgets_t)(char * restrict str, int size, FILE * restrict stream);
-pglite_fgets_t pglite_fgets = NULL;
+// typedef char* (*pglite_fgets_t)(char * restrict str, int size, FILE * restrict stream);
+// pglite_fgets_t pglite_fgets = NULL;
 
-void EMSCRIPTEN_KEEPALIVE
-pgl_set_fgets_fn(pglite_fgets_t fgets_fn) {
-    pglite_fgets = fgets_fn;
-}
+// void EMSCRIPTEN_KEEPALIVE
+// pgl_set_fgets_fn(pglite_fgets_t fgets_fn) {
+//     pglite_fgets = fgets_fn;
+// }
 
-char* EMSCRIPTEN_KEEPALIVE
-pgl_fgets(char * restrict str, int size, FILE * restrict stream) {
-    if (pglite_fgets) {
-        // pgl_errno = PGL_ERR_NO_ERROR;
-        return pglite_fgets(str, size, stream);
-        // if (pgl_errno == PGL_ERR_NO_ERROR) {
-        //     return ret;
-        // }
-    }
-    // should throw
-    return fgets(str, size, stream);
-}
+// char* EMSCRIPTEN_KEEPALIVE
+// pgl_fgets(char * restrict str, int size, FILE * restrict stream) {
+//     if (pglite_fgets) {
+//         // pgl_errno = PGL_ERR_NO_ERROR;
+//         return pglite_fgets(str, size, stream);
+//         // if (pgl_errno == PGL_ERR_NO_ERROR) {
+//         //     return ret;
+//         // }
+//     }
+//     // should throw
+//     return fgets(str, size, stream);
+// }
 
-typedef int (*pglite_fputs_t)(const char * s, FILE * stream);
-pglite_fputs_t pglite_fputs = NULL;
+// typedef int (*pglite_fputs_t)(const char * s, FILE * stream);
+// pglite_fputs_t pglite_fputs = NULL;
 
-void EMSCRIPTEN_KEEPALIVE
-pgl_set_fputs_fn(pglite_fputs_t fputs_fn) {
-    pglite_fputs = fputs_fn;
-}
+// void EMSCRIPTEN_KEEPALIVE
+// pgl_set_fputs_fn(pglite_fputs_t fputs_fn) {
+//     pglite_fputs = fputs_fn;
+// }
 
-int EMSCRIPTEN_KEEPALIVE
-pgl_fputs(const char *s, FILE *stream) {
-    if (pglite_fputs) {
-        // pgl_errno = PGL_ERR_NO_ERROR;
-        return pglite_fputs(s, stream);
-        // if (pgl_errno == PGL_ERR_NO_ERROR) {
-        //     return ret;
-        // }
-    }
-    return fputs(s, stream);
-}
+// int EMSCRIPTEN_KEEPALIVE
+// pgl_fputs(const char *s, FILE *stream) {
+//     if (pglite_fputs) {
+//         // pgl_errno = PGL_ERR_NO_ERROR;
+//         return pglite_fputs(s, stream);
+//         // if (pgl_errno == PGL_ERR_NO_ERROR) {
+//         //     return ret;
+//         // }
+//     }
+//     return fputs(s, stream);
+// }
 
 #define PGLITE_UID 123
 
@@ -112,6 +114,26 @@ pgl_getuid(void) {
     return PGLITE_UID;
 }
 
+struct passwd* EMSCRIPTEN_KEEPALIVE
+pgl_getpwuid(uid_t uid) {
+    static struct passwd pw;
+    static char name[] = "web_user";
+    static char passwd[] = "x";
+    static char gecos[] = "Static User";
+    static char dir[] = "/home/web_user";
+    static char shell[] = "/bin/sh";
+
+    pw.pw_name   = name;
+    pw.pw_passwd = passwd;
+    pw.pw_uid    = uid;
+    pw.pw_gid    = uid;
+    pw.pw_gecos  = gecos;
+    pw.pw_dir    = dir;
+    pw.pw_shell  = shell;
+
+    return &pw;
+}
+
 void EMSCRIPTEN_KEEPALIVE
 pgl_exit(int status) {
     optind = 1;
@@ -119,6 +141,19 @@ pgl_exit(int status) {
         exit(status);
     }
     exit(status);
+}
+
+char cwd[256];
+
+const char* EMSCRIPTEN_KEEPALIVE
+pgl_getcwd() {
+    char *ptr = getcwd(cwd, 256);
+    return ptr;
+}
+
+int EMSCRIPTEN_KEEPALIVE
+pgl_chdir(const char *path) {
+    return chdir(path);
 }
 
 // ============ SHM ===============

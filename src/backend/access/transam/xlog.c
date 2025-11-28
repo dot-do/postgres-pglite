@@ -4898,6 +4898,9 @@ XLOGShmemInit(void)
 	XLogCtl = (XLogCtlData *)
 		ShmemInitStruct("XLOG Ctl", XLOGShmemSize(), &foundXLog);
 
+// #ifdef __PGLITE__
+// 	ControlFile = NULL;
+// #endif
 	localControlFile = ControlFile;
 	ControlFile = (ControlFileData *)
 		ShmemInitStruct("Control File", sizeof(ControlFileData), &foundCFile);
