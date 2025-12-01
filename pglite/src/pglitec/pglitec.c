@@ -175,9 +175,11 @@ int EMSCRIPTEN_KEEPALIVE
 shmget(key_t key, size_t size, int shmflg) {
     ShmSegment *seg = shm_list;
 
+    printf("pglitec: shmget %d\n%d\n%d", key, size, shmflg);
+
     // Search for existing segment
     while (seg) {
-        if (seg->key == key) return (int)(uintptr_t)seg->addr;
+        if (seg->key == key) return seg->shmid;
         seg = seg->next;
     }
 
@@ -204,6 +206,7 @@ shmget(key_t key, size_t size, int shmflg) {
         new_seg->next = shm_list;
         shm_list = new_seg;
 
+        printf("pglitec: shmget %d", new_seg->shmid);
         return new_seg->shmid;
     }
 
@@ -231,17 +234,11 @@ void EMSCRIPTEN_KEEPALIVE
 int EMSCRIPTEN_KEEPALIVE
 shmdt(const void *shmaddr) {
     ShmSegment *seg = shm_list;
-    ShmSegment *prev = NULL;
 
     while (seg) {
         if (seg->addr == shmaddr) {
-            free(seg->addr);
-            if (prev) prev->next = seg->next;
-            else shm_list = seg->next;
-            free(seg);
             return 0;
         }
-        prev = seg;
         seg = seg->next;
     }
 
@@ -273,6 +270,7 @@ shmctl(int shmid, int cmd, struct shmid_ds *buf) {
                 seg->size = buf->shm_segsz;
                 return 0;
             } else {
+                fprintf(stderr, "pglitec: shmctl: no such cmd %d\n", cmd);
                 errno = EINVAL;
                 return -1;
             }
@@ -281,6 +279,7 @@ shmctl(int shmid, int cmd, struct shmid_ds *buf) {
         seg = seg->next;
     }
 
+    fprintf(stderr, "pglitec: shmctl: no such segment %d\n", shmid);
     errno = EINVAL;
     return -1;
 }
