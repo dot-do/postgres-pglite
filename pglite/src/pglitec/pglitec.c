@@ -175,8 +175,6 @@ int EMSCRIPTEN_KEEPALIVE
 shmget(key_t key, size_t size, int shmflg) {
     ShmSegment *seg = shm_list;
 
-    printf("pglitec: shmget %d\n%d\n%d", key, size, shmflg);
-
     // Search for existing segment
     while (seg) {
         if (seg->key == key) return seg->shmid;
@@ -206,7 +204,6 @@ shmget(key_t key, size_t size, int shmflg) {
         new_seg->next = shm_list;
         shm_list = new_seg;
 
-        printf("pglitec: shmget %d", new_seg->shmid);
         return new_seg->shmid;
     }
 
@@ -282,6 +279,36 @@ shmctl(int shmid, int cmd, struct shmid_ds *buf) {
     fprintf(stderr, "pglitec: shmctl: no such segment %d\n", shmid);
     errno = EINVAL;
     return -1;
+}
+
+
+// ========== DUP ============
+
+int
+dup(int fd) {
+    fprintf(stderr, "dup %d\n", fd);
+    return fd;
+}
+int
+dup2(int old, int new) {
+    fprintf(stderr, "dup2 %d %d\n", old, new);
+    return -1;
+}
+
+typedef int (*pglite_pipe_t)(int fd[2]);
+pglite_pipe_t pglite_pipe_fn = NULL;
+
+void EMSCRIPTEN_KEEPALIVE
+pgl_set_pipe_fn(pglite_pipe_t pipe_fn) {
+    pglite_pipe_fn = pipe_fn;
+}
+
+int EMSCRIPTEN_KEEPALIVE
+pgl_pipe(int fd[2]) {
+    if (pglite_pipe_fn) {
+        return pglite_pipe_fn(fd);
+    }
+    return pipe(fd);
 }
 
 // typedef ssize_t (*pglite_write_t)(int fd, const void *buf, size_t count);

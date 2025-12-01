@@ -34,7 +34,8 @@ PGLITE_CFLAGS="$PGLITE_CFLAGS \
 -D__PGLITE__ \
 -Dsystem=pgl_system -Dpopen=pgl_popen -Dpclose=pgl_pclose \
 -Dgeteuid=pgl_geteuid -Dgetuid=pgl_getuid -Dgetpwuid=pgl_getpwuid \
--Dexit=pgl_exit"
+-Dexit=pgl_exit \
+-Dpipe=pgl_pipe"
 
 echo "pglite: PGLITE_CFLAGS=$PGLITE_CFLAGS"
 
@@ -69,7 +70,7 @@ PGLITE_LDFLAGS_EX="\
 -sEXPORT_NAME=Module -sALLOW_TABLE_GROWTH -sALLOW_MEMORY_GROWTH \
 -sERROR_ON_UNDEFINED_SYMBOLS=0 \
 -sEXPORTED_RUNTIME_METHODS=$EXPORTED_RUNTIME_METHODS \
--sTOTAL_MEMORY=32MB \
+-sTOTAL_MEMORY=512MB \
 -sINVOKE_RUN=0 \
 -sEXPORTED_FUNCTIONS=_main,_fgets,_fputs,_pclose,_fopen,_fclose,___errno_location,_strerror \
 $(pwd)/pglite/src/pglitec/pglitec.o \
