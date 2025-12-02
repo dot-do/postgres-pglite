@@ -116,7 +116,9 @@ PGPRELOAD="\
 --preload-file $(pwd)/pglite/static/empty@/pglite/bin/postgres \
 --preload-file $PGROOT/share/postgresql@/pglite/share/postgresql \
 --preload-file $PGROOT/lib/postgresql@/pglite/lib/postgresql \
---preload-file $(pwd)/pglite/static/password@/pglite/password"
+--preload-file $(pwd)/pglite/static/password@/pglite/password \
+--preload-file $(pwd)/pglite/static/empty@/pglite/pgstdin \
+--preload-file $(pwd)/pglite/static/empty@/pglite/pgstdout"
 PGLITE_EXPORTED_RUNTIME_METHODS="MEMFS,IDBFS,FS,setValue,getValue,UTF8ToString,stringToNewUTF8,allocateUTF8OnStack,stringToUTF8OnStack,addFunction,removeFunction,callMain,ENV"
 
 # -sDYLINK_DEBUG=2 use this for debugging missing exported symbols (ex when an extension calls a pgcore function that hasn't been exported)
