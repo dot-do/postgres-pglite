@@ -1,6 +1,8 @@
+__funcs_on_exit
 close
 fclose
 fcntl
+fflush
 fopen
 free
 getpid

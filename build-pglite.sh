@@ -10,20 +10,20 @@ emcc --clear-cache
 INSTALL_FOLDER=${INSTALL_FOLDER:-"/pglite"}
 
 # build with optimizations by default aka release
-PGLITE_CFLAGS="-O2"
+PGLITE_CFLAGS="-m32 -sWASM_BIGINT -fpic -sENVIRONMENT=node,web,worker -sSUPPORT_LONGJMP=emscripten -Wno-declaration-after-statement -Wno-macro-redefined -Wno-unused-function -Wno-missing-prototypes -Wno-incompatible-pointer-types"
 if [ "$DEBUG" = true ]
 then
     echo "pglite: building debug version."
-    PGLITE_CFLAGS="-g -gsource-map --no-wasm-opt"
+    PGLITE_CFLAGS="$PGLITE_CFLAGS -g -gsource-map --no-wasm-opt"
 else
     echo "pglite: building release version."
-    PGLITE_CFLAGS="-O2"
+    PGLITE_CFLAGS="$PGLITE_CFLAGS -O2"
     # we shouldn't need to do this, but there's a bug somewhere that prevents a successful build if this is set
     unset DEBUG
 fi
 
 # PGLITE_OTHER_FLAGS="-sUSE_PTHREADS=0 -fPIC -m32 -mno-bulk-memory -mnontrapping-fptoint -mno-reference-types -mno-sign-ext -mno-extended-const -mno-atomics -mno-tail-call -mno-multivalue -mno-relaxed-simd -mno-simd128 -mno-multimemory -mno-exception-handling -Wno-unused-command-line-argument -Wno-unreachable-code-fallthrough -Wno-unused-function -Wno-invalid-noreturn -Wno-declaration-after-statement -Wno-invalid-noreturn"
-PGLITE_CFLAGS="$PGLITE_CFLAGS -m32"
+# PGLITE_CFLAGS="$PGLITE_CFLAGS"
 
 # first build pglite-libc object WITHOUT the overriding flags
 # pushd pglite/src/pglitec && emcc -g --no-wasm-opt -gsource-map -static -fPIC -o pglitec.o -c pglitec.c && popd
@@ -34,8 +34,7 @@ PGLITE_CFLAGS="$PGLITE_CFLAGS \
 -D__PGLITE__ \
 -Dsystem=pgl_system -Dpopen=pgl_popen -Dpclose=pgl_pclose \
 -Dgeteuid=pgl_geteuid -Dgetuid=pgl_getuid -Dgetpwuid=pgl_getpwuid \
--Dexit=pgl_exit \
--Dpipe=pgl_pipe"
+-Dexit=pgl_exit"
 
 echo "pglite: PGLITE_CFLAGS=$PGLITE_CFLAGS"
 
@@ -59,7 +58,7 @@ PGLITE_LDFLAGS="-sWASM_BIGINT -sUSE_PTHREADS=0"
 PGLITE_LDFLAGS_SL="-shared -sSIDE_MODULE=1 -Wno-unused-function"
 
 # we define here "all" emscripten flags in order to allow native builds (like libpglite)
-EXPORTED_RUNTIME_METHODS="addFunction,removeFunction,FS,MEMFS,PROXYFS,callMain,ENV,UTF8ToString,stringToNewUTF8,allocateUTF8,allocateUTF8OnStack,stringToUTF8OnStack"
+EXPORTED_RUNTIME_METHODS="addFunction,removeFunction,FS,MEMFS,PROXYFS,callMain,ENV,UTF8ToString,stringToNewUTF8,stringToUTF8OnStack"
 PGLITE_LDFLAGS_EX="\
 -sWASM_BIGINT \
 -sSUPPORT_LONGJMP=emscripten \
@@ -76,12 +75,35 @@ PGLITE_LDFLAGS_EX="\
 $(pwd)/pglite/src/pglitec/pglitec.o \
 -lproxyfs.js"
 
+# --with-blocksize=16 
+# --disable-largefile 
+# --with-blocksize=1 
+
+CONFIGURE_PARAMS="\
+ac_cv_exeext=.js \
+--host aarch64-unknown-linux-gnu \
+--disable-spinlocks \
+--disable-largefile \
+--without-llvm  \
+--without-pam \
+--with-openssl=no \
+--without-readline \
+--without-icu \
+--with-includes=$INSTALL_PREFIX/include:$INSTALL_PREFIX/include/libxml2:$(pwd)/pglite/src/include \
+--with-libraries=$INSTALL_PREFIX/lib:$(pwd)/pglite/src/pglite-libc \
+--with-uuid=ossp \
+--with-zlib \
+--with-libxml \
+--with-libxslt \
+--with-template=emscripten \
+--prefix=$INSTALL_FOLDER"
+
 # Step 1: configure the project
 if [ "$RUN_CONFIGURE" = true ]; then
     LDFLAGS=$PGLITE_LDFLAGS \
     LDFLAGS_SL=$PGLITE_LDFLAGS_SL \
     LDFLAGS_EX=$PGLITE_LDFLAGS_EX \
-    CFLAGS="${PGLITE_CFLAGS} -sWASM_BIGINT -fpic -sENVIRONMENT=node,web,worker -sSUPPORT_LONGJMP=emscripten -Wno-declaration-after-statement -Wno-macro-redefined -Wno-unused-function -Wno-missing-prototypes -Wno-incompatible-pointer-types" emconfigure ./configure ac_cv_exeext=.js --host aarch64-unknown-linux-gnu --disable-spinlocks --disable-largefile --without-llvm  --without-pam --with-openssl=no --without-readline --without-icu --with-includes=$INSTALL_PREFIX/include:$INSTALL_PREFIX/include/libxml2:$(pwd)/pglite/src/include --with-libraries=$INSTALL_PREFIX/lib:$(pwd)/pglite/src/pglite-libc --with-uuid=ossp --with-zlib --with-libxml --with-libxslt --with-template=emscripten --prefix=$INSTALL_FOLDER || { echo 'error: emconfigure failed' ; exit 11; }
+    CFLAGS=${PGLITE_CFLAGS} emconfigure ./configure $CONFIGURE_PARAMS || { echo 'error: emconfigure failed' ; exit 11; }
 else
     echo "Warning: configure has not been run because RUN_CONFIGURE=${RUN_CONFIGURE}"
 fi
@@ -118,8 +140,10 @@ PGPRELOAD="\
 --preload-file $PGROOT/lib/postgresql@/pglite/lib/postgresql \
 --preload-file $(pwd)/pglite/static/password@/pglite/password \
 --preload-file $(pwd)/pglite/static/empty@/pglite/pgstdin \
---preload-file $(pwd)/pglite/static/empty@/pglite/pgstdout"
-PGLITE_EXPORTED_RUNTIME_METHODS="MEMFS,IDBFS,FS,setValue,getValue,UTF8ToString,stringToNewUTF8,allocateUTF8OnStack,stringToUTF8OnStack,addFunction,removeFunction,callMain,ENV"
+--preload-file $(pwd)/pglite/static/empty@/pglite/pgstdout \
+--preload-file $(pwd)/pglite/static/locale-a@/pglite/locale-a"
+
+PGLITE_EXPORTED_RUNTIME_METHODS="MEMFS,IDBFS,FS,PROXYFS,setValue,getValue,UTF8ToString,stringToNewUTF8,stringToUTF8OnStack,addFunction,removeFunction,callMain,ENV"
 
 # -sDYLINK_DEBUG=2 use this for debugging missing exported symbols (ex when an extension calls a pgcore function that hasn't been exported)
 #WASM_COMPILE_FLAGS="-m32 -mno-bulk-memory -mnontrapping-fptoint -mno-reference-types -mno-sign-ext -mno-extended-const -mno-atomics -mno-tail-call -mno-multivalue -mno-relaxed-simd -mno-simd128 -mno-multimemory -mno-exception-handling"

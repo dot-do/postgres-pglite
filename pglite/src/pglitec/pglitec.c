@@ -61,46 +61,6 @@ pgl_pclose(FILE* stream) {
     return pclose(stream);
 }
 
-// typedef char* (*pglite_fgets_t)(char * restrict str, int size, FILE * restrict stream);
-// pglite_fgets_t pglite_fgets = NULL;
-
-// void EMSCRIPTEN_KEEPALIVE
-// pgl_set_fgets_fn(pglite_fgets_t fgets_fn) {
-//     pglite_fgets = fgets_fn;
-// }
-
-// char* EMSCRIPTEN_KEEPALIVE
-// pgl_fgets(char * restrict str, int size, FILE * restrict stream) {
-//     if (pglite_fgets) {
-//         // pgl_errno = PGL_ERR_NO_ERROR;
-//         return pglite_fgets(str, size, stream);
-//         // if (pgl_errno == PGL_ERR_NO_ERROR) {
-//         //     return ret;
-//         // }
-//     }
-//     // should throw
-//     return fgets(str, size, stream);
-// }
-
-// typedef int (*pglite_fputs_t)(const char * s, FILE * stream);
-// pglite_fputs_t pglite_fputs = NULL;
-
-// void EMSCRIPTEN_KEEPALIVE
-// pgl_set_fputs_fn(pglite_fputs_t fputs_fn) {
-//     pglite_fputs = fputs_fn;
-// }
-
-// int EMSCRIPTEN_KEEPALIVE
-// pgl_fputs(const char *s, FILE *stream) {
-//     if (pglite_fputs) {
-//         // pgl_errno = PGL_ERR_NO_ERROR;
-//         return pglite_fputs(s, stream);
-//         // if (pgl_errno == PGL_ERR_NO_ERROR) {
-//         //     return ret;
-//         // }
-//     }
-//     return fputs(s, stream);
-// }
 
 #define PGLITE_UID 123
 
@@ -137,23 +97,21 @@ pgl_getpwuid(uid_t uid) {
 void EMSCRIPTEN_KEEPALIVE
 pgl_exit(int status) {
     optind = 1;
-    if (status) {
-        exit(status);
-    }
     exit(status);
 }
 
-char cwd[256];
-
-const char* EMSCRIPTEN_KEEPALIVE
-pgl_getcwd() {
-    char *ptr = getcwd(cwd, 256);
-    return ptr;
-}
-
-int EMSCRIPTEN_KEEPALIVE
-pgl_chdir(const char *path) {
-    return chdir(path);
+FILE * EMSCRIPTEN_KEEPALIVE
+pgl_freopen(const char *pathname, const char *mode, int streamid) {
+    if (streamid == 0) {
+        return freopen(pathname, mode, stdin);
+    }
+    if (streamid == 1) {
+        return freopen(pathname, mode, stdout);
+    }
+    if (streamid == 2) {
+        return freopen(pathname, mode, stderr);
+    }
+    return NULL;
 }
 
 // ============ SHM ===============
@@ -183,7 +141,9 @@ shmget(key_t key, size_t size, int shmflg) {
 
     // If IPC_CREAT is set, create new segment
     if (shmflg & IPC_CREAT) {
-        void *mem = malloc(size);
+        int pagesize = getpagesize();
+        while (pagesize < size) pagesize += pagesize;
+        void *mem = malloc(pagesize);
         if (!mem) {
             errno = ENOMEM;
             return -1;
@@ -284,32 +244,32 @@ shmctl(int shmid, int cmd, struct shmid_ds *buf) {
 
 // ========== DUP ============
 
-int
-dup(int fd) {
-    fprintf(stderr, "dup %d\n", fd);
-    return fd;
-}
-int
-dup2(int old, int new) {
-    fprintf(stderr, "dup2 %d %d\n", old, new);
-    return -1;
-}
+// int
+// dup(int fd) {
+//     fprintf(stderr, "dup %d\n", fd);
+//     return fd;
+// }
+// int
+// dup2(int old, int new) {
+//     fprintf(stderr, "dup2 %d %d\n", old, new);
+//     return -1;
+// }
 
-typedef int (*pglite_pipe_t)(int fd[2]);
-pglite_pipe_t pglite_pipe_fn = NULL;
+// typedef int (*pglite_pipe_t)(int fd[2]);
+// pglite_pipe_t pglite_pipe_fn = NULL;
 
-void EMSCRIPTEN_KEEPALIVE
-pgl_set_pipe_fn(pglite_pipe_t pipe_fn) {
-    pglite_pipe_fn = pipe_fn;
-}
+// void EMSCRIPTEN_KEEPALIVE
+// pgl_set_pipe_fn(pglite_pipe_t pipe_fn) {
+//     pglite_pipe_fn = pipe_fn;
+// }
 
-int EMSCRIPTEN_KEEPALIVE
-pgl_pipe(int fd[2]) {
-    if (pglite_pipe_fn) {
-        return pglite_pipe_fn(fd);
-    }
-    return pipe(fd);
-}
+// int EMSCRIPTEN_KEEPALIVE
+// pgl_pipe(int fd[2]) {
+//     if (pglite_pipe_fn) {
+//         return pglite_pipe_fn(fd);
+//     }
+//     return pipe(fd);
+// }
 
 // typedef ssize_t (*pglite_write_t)(int fd, const void *buf, size_t count);
 // pglite_write_t pglite_write_fn = NULL;
@@ -357,4 +317,17 @@ pgl_pipe(int fd[2]) {
 //     int curr = pgl_errno;
 //     pgl_errno = x;
 //     return curr;
+// }
+
+// char cwd[256];
+
+// const char* EMSCRIPTEN_KEEPALIVE
+// pgl_getcwd() {
+//     char *ptr = getcwd(cwd, 256);
+//     return ptr;
+// }
+
+// int EMSCRIPTEN_KEEPALIVE
+// pgl_chdir(const char *path) {
+//     return chdir(path);
 // }
