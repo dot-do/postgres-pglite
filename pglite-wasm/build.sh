@@ -263,10 +263,12 @@ ________________________________________________________
         # wgpu ???
         export EMCC_FORCE_STDLIBS=1
 
-        if COPTS="-O2 -g3" ${CC} ${CC_PGLITE} ${PGINC} -o ${PGL_DIST_JS}/pglite-js.js \
+        # TRAMPOLINE MODE: Removed ALLOW_TABLE_GROWTH for Workers compatibility
+        # Use size-optimized flags for production builds
+        if COPTS="${LOPTS:-"-Oz -flto -fno-exceptions"}" ${CC} ${CC_PGLITE} ${PGINC} -o ${PGL_DIST_JS}/pglite-js.js \
          -sGLOBAL_BASE=${CMA_MB}MB -ferror-limit=1  \
          -sFORCE_FILESYSTEM=1 $EMCC_NODE -sMAIN_MODULE=1 -sEXPORT_ALL -sASSERTIONS=0 \
-             -sALLOW_TABLE_GROWTH -sALLOW_MEMORY_GROWTH -sERROR_ON_UNDEFINED_SYMBOLS=0 \
+             -sALLOW_MEMORY_GROWTH -sERROR_ON_UNDEFINED_SYMBOLS=0 \
              -sEXPORTED_RUNTIME_METHODS=${EXPORTED_RUNTIME_METHODS} \
          ${BUILD_PATH}/pglite.o \
          $LIBPGCORE \
@@ -307,13 +309,18 @@ ________________________________________________________
 
 # LOPTS="-Os -g0"
 #
+        # TRAMPOLINE MODE: Removed ALLOW_TABLE_GROWTH for Workers compatibility
+        # Added 'worker' to ENVIRONMENT for Cloudflare Workers
+        # LZ4 compression: -sLZ4=1 enables lazy decompression for preloaded files
+        # This compresses pglite.data from ~4.7MB to ~2.0MB with on-demand decompression
         if COPTS="$LOPTS" ${CC} ${CC_PGLITE} -o ${PGL_DIST_WEB}/pglite.html --shell-file ${WORKSPACE}/pglite-${PG_BRANCH}/repl.html \
          $PGPRELOAD \
          -sGLOBAL_BASE=${CMA_MB}MB -ferror-limit=1 \
-         -sFORCE_FILESYSTEM=1 -sNO_EXIT_RUNTIME=1 -sENVIRONMENT=node,web \
+         -sFORCE_FILESYSTEM=1 -sNO_EXIT_RUNTIME=1 -sENVIRONMENT=node,web,worker \
+         -sLZ4=1 \
          $LINKER \
          -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=Module \
-             -sALLOW_TABLE_GROWTH -sALLOW_MEMORY_GROWTH -sERROR_ON_UNDEFINED_SYMBOLS=1 \
+             -sALLOW_MEMORY_GROWTH -sERROR_ON_UNDEFINED_SYMBOLS=1 \
              -sEXPORTED_RUNTIME_METHODS=${EXPORTED_RUNTIME_METHODS} \
          ${PGINC} ${BUILD_PATH}/pglite.o \
          $LIBPGCORE \
@@ -321,6 +328,39 @@ ________________________________________________________
          -lnodefs.js -lidbfs.js ${LINK_CRYPTO} -lxml2 -lz
         then
             du -hs du -hs ${PG_DIST}/*
+
+            # Post-build WASM optimization with wasm-opt (Binaryen)
+            # -Oz: Optimize for size
+            # --converge: Keep optimizing until no more improvements
+            if which wasm-opt > /dev/null 2>&1
+            then
+                echo "
+    * Running wasm-opt post-build optimization on pglite.wasm
+"
+                WASM_FILE="${PGL_DIST_WEB}/pglite.wasm"
+                if [ -f "$WASM_FILE" ]
+                then
+                    WASM_SIZE_BEFORE=$(du -b "$WASM_FILE" | cut -f1)
+                    echo "    WASM size before wasm-opt: $(du -h "$WASM_FILE" | cut -f1)"
+
+                    # Run wasm-opt with size optimization and converge
+                    wasm-opt -Oz --converge "$WASM_FILE" -o "${WASM_FILE}.opt" && \
+                    mv "${WASM_FILE}.opt" "$WASM_FILE"
+
+                    WASM_SIZE_AFTER=$(du -b "$WASM_FILE" | cut -f1)
+                    echo "    WASM size after wasm-opt:  $(du -h "$WASM_FILE" | cut -f1)"
+                    SAVINGS=$((WASM_SIZE_BEFORE - WASM_SIZE_AFTER))
+                    echo "    Savings: $((SAVINGS / 1024)) KB"
+                else
+                    echo "    Warning: pglite.wasm not found at $WASM_FILE, skipping wasm-opt"
+                fi
+            else
+                echo "
+    * wasm-opt not found in PATH, skipping post-build optimization
+    * Install Binaryen for additional ~5-10% size reduction: https://github.com/WebAssembly/binaryen
+"
+            fi
+
             touch ${WORKSPACE}/${BUILD}.done
         else
             echo "

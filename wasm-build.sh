@@ -22,8 +22,9 @@ fi
 
 # data transfer zone this is == (wire query size + result size ) + 2
 # expressed in EMSDK MB, max is 13MB on emsdk 3.1.74+
-export CMA_MB=${CMA_MB:-12}
-export TOTAL_MEMORY=${TOTAL_MEMORY:-180MB}
+export CMA_MB=${CMA_MB:-8}
+# Reduced for Cloudflare Workers 128MB limit
+export TOTAL_MEMORY=${TOTAL_MEMORY:-128MB}
 
 
 export WORKSPACE=${GITHUB_WORKSPACE:-$(pwd)}
@@ -101,9 +102,12 @@ export LOPTS=${LOPTS:-"-O2 -g3 --no-wasm-opt -sASSERTIONS=1"}
 
 
     else
-        # DO NOT CHANGE COPTS - optimized wasm corruption fix
-        export COPTS="-O2 -g3" # --no-wasm-opt"
-        export LOPTS=${LOPTS:-"-O2 -g0 --closure=0 -sASSERTIONS=0"}
+        # Size-optimized build for production
+        # -Oz: Optimize for size over speed
+        # -flto: Link-time optimization for better dead code elimination
+        # -fno-exceptions: Remove C++ exception handling overhead (PostgreSQL is C)
+        export COPTS="-Oz -flto -fno-exceptions"
+        export LOPTS=${LOPTS:-"-Oz -flto -fno-exceptions --closure=0 -sASSERTIONS=0"}
     fi
 fi
 
