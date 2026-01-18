@@ -53,18 +53,20 @@
 #define PG_FORCE_DISABLE_INLINE
 
 
+// Memory-optimized settings for Cloudflare Workers (128MB limit)
 #define WASM_PGOPTS \
         "-c", "log_checkpoints=false",\
         "-c", "search_path=pg_catalog",\
         "-c", "exit_on_error=true",\
         "-c", "ignore_invalid_pages=on",\
-        "-c", "temp_buffers=8MB",\
-        "-c", "work_mem=4MB",\
+        "-c", "temp_buffers=1MB",\
+        "-c", "work_mem=1MB",\
         "-c", "fsync=on",\
         "-c", "synchronous_commit=on",\
-        "-c", "wal_buffers=4MB",\
-        "-c", "min_wal_size=80MB",\
-        "-c", "shared_buffers=128MB"
+        "-c", "wal_buffers=512KB",\
+        "-c", "min_wal_size=16MB",\
+        "-c", "shared_buffers=4MB",\
+        "-c", "max_connections=1"
 
 // we want client and server in the same lib for now.
 #if defined(PG_INITDB) && defined(PG_MAIN)
