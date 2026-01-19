@@ -188,9 +188,10 @@ describe('PGLite FTS Variant', () => {
      * Test: English-only build verification
      *
      * In an English-only build, other language configs should error.
-     * Skip this test if running against full build.
+     * This test only runs when PGLITE_VARIANT=fts is set, since the full build
+     * includes all language stemmers and would correctly support French.
      */
-    it.skip('should only have English stemmer in FTS variant', async () => {
+    it.skipIf(process.env.PGLITE_VARIANT !== 'fts')('should only have English stemmer in FTS variant', async () => {
       const db = trackInstance(new PGlite())
       await db.waitReady
 
