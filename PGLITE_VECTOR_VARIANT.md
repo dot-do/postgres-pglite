@@ -4,33 +4,44 @@ A specialized PGLite build optimized for AI/ML workloads, particularly vector si
 
 ## Overview
 
-The vector variant (`pglite-vector`) is a minimal PostgreSQL-in-WASM build that prioritizes:
-- Vector similarity operations with pgvector
-- JSON/JSONB for metadata storage
-- English full-text search
-- Small bundle size for edge deployment
+The vector variant (`pglite-vector`) is a PostgreSQL-in-WASM build that prioritizes:
+- Vector similarity operations with pgvector extension
+- JSON/JSONB for metadata storage alongside embeddings
+- English full-text search for hybrid search capabilities
+- Optimized bundle size for edge deployment
 
 ## Size Targets
 
-| Component | Standard Build | Vector Variant | Savings |
-|-----------|---------------|----------------|---------|
-| WASM Binary | ~8.5 MB | ~6-7 MB | ~1.5-2.5 MB |
-| Data Bundle | ~4.7 MB | ~3-4 MB | ~1-1.7 MB |
-| Total Bundle | ~13 MB | ~10-11 MB | ~2-3 MB |
-| Memory Footprint | ~80 MB | ~55-65 MB | ~15-25 MB |
+| Component | Full Build | Vector Variant | Description |
+|-----------|------------|----------------|-------------|
+| WASM Binary | ~8.5 MB | ~6.2 MB | Core PostgreSQL engine |
+| Data Bundle | ~4.7 MB | ~2.9 MB | LZ4 compressed filesystem |
+| Vector Extension | ~45 KB | ~45 KB | pgvector 0.8.0 tarball |
+| JS Runtime | ~395 KB | ~350 KB | Emscripten module loader |
+| **Total Bundle** | **~13.6 MB** | **~9.5 MB** | Complete package |
+| Memory Footprint | ~80 MB | ~60-65 MB | After initialization |
 
 ### Size Optimizations Applied
 
-1. **English-Only Snowball Stemmers** (~500KB+ savings)
-   - Removes 23+ language stemmers
-   - Keeps English and Porter stemmers for FTS
+The vector variant applies the following optimizations to achieve the ~9.5MB target:
+
+1. **English-Only Snowball Stemmers** (~500KB savings)
+   - Removes 26+ language stemmers (Arabic, French, German, Spanish, etc.)
+   - Keeps English stemmer for hybrid FTS+vector search
 
 2. **UTF-8 Only Encoding** (~1.8MB savings)
-   - Removes charset converters for Asian/legacy encodings
-   - Suitable for applications using UTF-8 throughout
+   - Removes charset converters for Asian/legacy encodings (Big5, EUC-CN, EUC-JP, etc.)
+   - UTF-8 is standard for modern AI/ML applications
 
-3. **Reduced Debug Info** (varies)
-   - Release build with size optimization flags
+3. **Size-Optimized Compilation** (~1.5MB savings)
+   - `-Oz` optimization for smallest binary size
+   - Link-time optimization (LTO) for dead code elimination
+   - No debug symbols in release builds
+   - Closure compiler for JS minification
+
+4. **Selective Extension Inclusion**
+   - Only pgvector extension included
+   - Excludes pgcrypto (~1.1MB), contrib extensions
 
 ## Features Included
 
@@ -145,12 +156,13 @@ TOTAL_MEMORY=128MB ./build-pglite-vector.sh
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DEBUG` | `false` | Enable debug symbols |
-| `TOTAL_MEMORY` | `64MB` | Maximum memory allocation |
-| `CMA_MB` | `6` | Contiguous memory area size in MB |
+| `DEBUG` | `false` | Enable debug symbols (increases size significantly) |
+| `TOTAL_MEMORY` | `64MB` | Initial memory allocation |
+| `CMA_MB` | `8` | Contiguous memory area for wire protocol (MB) |
 | `PGLITE_UTF8_ONLY` | `true` | UTF-8 only charset support |
 | `SNOWBALL_LANGUAGES` | `english` | Snowball stemmer languages |
 | `PREBUNDLE_VECTOR` | `true` | Pre-bundle vector extension |
+| `PGLITE_VECTOR_DIST` | `/tmp/pglite-vector` | Output directory for build |
 
 ## Testing
 
@@ -169,8 +181,18 @@ The vector variant is designed for:
 - Browser-based applications
 - Embedded AI assistants
 
+## Build Requirements
+
+Building the vector variant requires:
+- Docker (for consistent Emscripten SDK environment)
+- ~10GB disk space for build artifacts
+- ~30 minutes for full build
+
+The build uses the Emscripten SDK to compile PostgreSQL to WebAssembly with the trampoline fix for Cloudflare Workers compatibility.
+
 ## Related Issues
 
+- postgres-q0t8: Build and validate vector variant with pgvector
 - postgres-4box.3: Create pglite-vector build variant (AI/ML optimized)
 - postgres-4box: Build variants epic
 
