@@ -12,14 +12,31 @@ The vector variant (`pglite-vector`) is a PostgreSQL-in-WASM build that prioriti
 
 ## Size Targets
 
-| Component | Full Build | Vector Variant | Description |
-|-----------|------------|----------------|-------------|
-| WASM Binary | ~8.5 MB | ~6.2 MB | Core PostgreSQL engine |
-| Data Bundle | ~4.7 MB | ~2.9 MB | LZ4 compressed filesystem |
-| Vector Extension | ~45 KB | ~45 KB | pgvector 0.8.0 tarball |
-| JS Runtime | ~395 KB | ~350 KB | Emscripten module loader |
-| **Total Bundle** | **~13.6 MB** | **~9.5 MB** | Complete package |
+| Component | Full Build | Vector Variant Target | Description |
+|-----------|------------|----------------------|-------------|
+| WASM Binary | 8.46 MB | ~6.2 MB | Core PostgreSQL engine |
+| Data Bundle | 4.71 MB | ~2.9 MB | LZ4 compressed filesystem |
+| Vector Extension | 45 KB | 45 KB | pgvector 0.8.0 tarball |
+| JS Runtime | ~360 KB | ~350 KB | Emscripten module loader |
+| **Total Bundle** | **13.22 MB** | **~9.5 MB** | Complete package |
 | Memory Footprint | ~80 MB | ~60-65 MB | After initialization |
+
+### Current Build Status (as of 2026-01-20)
+
+**Full Build Measurements:**
+- `pglite.wasm`: 8,880,453 bytes (8.46 MB)
+- `pglite.data`: 4,940,053 bytes (4.71 MB)
+- `vector.tar.gz`: 46,046 bytes (45 KB)
+- `index.js`: 368,708 bytes (360 KB)
+- **Total**: 13,866,552 bytes (13.22 MB)
+
+**Status**: The vector-optimized build has not yet been executed. The current build includes:
+- All 27+ Snowball language stemmers (vector variant: English only)
+- All charset converters (vector variant: UTF-8 only)
+- Standard optimization flags (vector variant: -Oz with LTO)
+
+**Required**: Execute `build-pglite-vector.sh` in Docker to produce the optimized ~9.5MB bundle.
+See issue `postgres-mglm` for build execution status.
 
 ### Size Optimizations Applied
 
