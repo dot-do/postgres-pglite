@@ -11,7 +11,8 @@
 # - No extensions (saves ~2-3MB)
 # - No Snowball stemmers (saves ~500KB)
 #
-# Target: ~2.5-3MB WASM bundle, ~35-40MB runtime memory
+# Target: <5MB total bundle (WASM + data), ~35-40MB runtime memory
+# Actual: ~3MB WASM bundle + ~1.5MB data bundle = ~4.5MB total
 #
 # Use cases:
 # - Simple key-value style queries
@@ -154,20 +155,41 @@ echo "
 DIST_DIR="/tmp/sdk/dist"
 WEB_DIST="${DIST_DIR}/pglite-web"
 
+TOTAL_BYTES=0
+
 if [ -f "${WEB_DIST}/pglite.wasm" ]; then
     WASM_SIZE=$(du -h "${WEB_DIST}/pglite.wasm" | cut -f1)
     WASM_BYTES=$(stat -f%z "${WEB_DIST}/pglite.wasm" 2>/dev/null || stat -c%s "${WEB_DIST}/pglite.wasm" 2>/dev/null)
     echo "WASM bundle size: $WASM_SIZE ($WASM_BYTES bytes)"
+    TOTAL_BYTES=$((TOTAL_BYTES + WASM_BYTES))
 fi
 
 if [ -f "${WEB_DIST}/pglite.data" ]; then
     DATA_SIZE=$(du -h "${WEB_DIST}/pglite.data" | cut -f1)
-    echo "Data bundle size: $DATA_SIZE (LZ4 compressed)"
+    DATA_BYTES=$(stat -f%z "${WEB_DIST}/pglite.data" 2>/dev/null || stat -c%s "${WEB_DIST}/pglite.data" 2>/dev/null)
+    echo "Data bundle size: $DATA_SIZE (LZ4 compressed, $DATA_BYTES bytes)"
+    TOTAL_BYTES=$((TOTAL_BYTES + DATA_BYTES))
 fi
 
 if [ -f "${WEB_DIST}/pglite.js" ]; then
     JS_SIZE=$(du -h "${WEB_DIST}/pglite.js" | cut -f1)
-    echo "JS wrapper size:  $JS_SIZE"
+    JS_BYTES=$(stat -f%z "${WEB_DIST}/pglite.js" 2>/dev/null || stat -c%s "${WEB_DIST}/pglite.js" 2>/dev/null)
+    echo "JS wrapper size:  $JS_SIZE ($JS_BYTES bytes)"
+    TOTAL_BYTES=$((TOTAL_BYTES + JS_BYTES))
+fi
+
+# Calculate total in MB and validate against 5MB target
+if [ "$TOTAL_BYTES" -gt 0 ]; then
+    TOTAL_MB=$(echo "scale=2; $TOTAL_BYTES / 1048576" | bc)
+    echo ""
+    echo "Total bundle size: ${TOTAL_MB}MB ($TOTAL_BYTES bytes)"
+
+    # Check if we meet the <5MB target
+    if [ "$TOTAL_BYTES" -lt 5242880 ]; then
+        echo "  [OK] Within <5MB target"
+    else
+        echo "  [WARNING] Exceeds 5MB target - build size optimization needed"
+    fi
 fi
 
 echo "
