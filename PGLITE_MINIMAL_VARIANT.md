@@ -328,7 +328,7 @@ For Cloudflare Workers (128MB limit):
 | pglite-tiny | ~3MB | ~1.5MB | 35-40MB | Minimal key-value |
 | **pglite-minimal** | **~5MB** | **~2MB** | **50-55MB** | **Core SQL (this variant)** |
 | pglite-json | ~4MB | ~2MB | 45-50MB | Document storage |
-| pglite-fts | ~6MB | ~2.5MB | 60-65MB | Full-text search |
+| pglite-fts | ~7MB | ~3.5MB | 60-65MB | Full-text search |
 | pglite-vector | ~5MB | ~2MB | 55-60MB | AI/ML vectors |
 | pglite-full | ~8.5MB | ~4.7MB | 80MB | All features |
 

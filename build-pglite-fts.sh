@@ -4,7 +4,7 @@
 # =============================================================================
 #
 # This script builds a PGLite variant optimized for full-text search use cases.
-# Target: ~6MB bundle, ~60-65MB memory
+# Target: ~10.5MB bundle (~7MB WASM + ~3.5MB data), ~60-65MB memory
 #
 # Use Cases:
 #   - Search engines

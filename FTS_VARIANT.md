@@ -7,7 +7,7 @@ Full-Text Search optimized PGLite build for search-focused applications.
 The FTS variant is a size-optimized PGLite build specifically designed for full-text search use cases. It includes all essential FTS functionality while excluding features not needed for search workloads.
 
 **Target Metrics:**
-- Bundle size: ~6MB (WASM + data)
+- Bundle size: ~10.5MB (WASM ~7MB + data ~3.5MB)
 - Memory usage: ~60-65MB
 
 ## Use Cases
@@ -215,11 +215,11 @@ SELECT metaphone('phone', 10), metaphone('fone', 10);
 
 ## Size Comparison
 
-| Build Variant | WASM Size | Data Size | Memory |
-|--------------|-----------|-----------|--------|
-| Full | ~10MB | ~4.7MB | 128MB |
-| FTS | ~6MB | ~2.5MB | 64MB |
-| Minimal | ~4MB | ~1.5MB | 32MB |
+| Build Variant | WASM Size | Data Size | Total Bundle | Memory |
+|--------------|-----------|-----------|--------------|--------|
+| Full | ~8.5MB | ~4.7MB | ~13.2MB | 128MB |
+| FTS | ~7MB | ~3.5MB | ~10.5MB | 64MB |
+| Minimal | ~4MB | ~1.5MB | ~5.5MB | 32MB |
 
 ## Testing
 
