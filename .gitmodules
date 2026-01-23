@@ -13,3 +13,6 @@
 [submodule "pglite/pg_hashids"]
 	path = pglite/pg_hashids
 	url = https://github.com/iCyberon/pg_hashids
+[submodule "extra/pg_textsearch"]
+	path = extra/pg_textsearch
+	url = https://github.com/dot-do/pg_textsearch.git
