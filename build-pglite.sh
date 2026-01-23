@@ -18,9 +18,10 @@ else
     echo "pglite: building release version."
     # Size-optimized build:
     # -Oz: Optimize for size over speed
-    # -flto: Link-time optimization for better dead code elimination
     # -fno-exceptions: Remove C++ exception handling overhead (PostgreSQL is C)
-    PGLITE_CFLAGS="$PGLITE_CFLAGS -Oz -flto -fno-exceptions"
+    # NOTE: -flto (link-time optimization) was removed because it causes _setjmp
+    # to be eliminated, breaking PostgreSQL's error handling (PG_TRY/PG_CATCH)
+    PGLITE_CFLAGS="$PGLITE_CFLAGS -Oz -fno-exceptions"
     # we shouldn't need to do this, but there's a bug somewhere that prevents a successful build if this is set
     unset DEBUG
 fi
