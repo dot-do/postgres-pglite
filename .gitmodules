@@ -16,3 +16,6 @@
 [submodule "pglite/pg_textsearch"]
 	path = pglite/pg_textsearch
 	url = https://github.com/timescale/pg_textsearch.git
+[submodule "extra/pg_textsearch"]
+	path = extra/pg_textsearch
+	url = https://github.com/timescale/pg_textsearch.git
