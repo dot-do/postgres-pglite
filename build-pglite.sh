@@ -45,16 +45,16 @@ else
 fi
 
 # we define here "all" emscripten flags in order to allow native builds (like libpglite)
-# TRAMPOLINE MODE: Removed addFunction,removeFunction and ALLOW_TABLE_GROWTH
-# This makes the WASM compatible with Cloudflare Workers which block runtime WASM compilation
-# Callbacks are now set via Module._pgliteCallbacks and EM_JS trampolines in pglite-comm.h
-EXPORTED_RUNTIME_METHODS="FS,MEMFS,wasmTable"
+# addFunction/removeFunction are needed for PostgreSQL read/write callbacks
+# ALLOW_TABLE_GROWTH enables runtime function table modification
+EXPORTED_RUNTIME_METHODS="FS,MEMFS,wasmTable,addFunction,removeFunction"
 PGLITE_EMSCRIPTEN_FLAGS="-sWASM_BIGINT \
 -sSUPPORT_LONGJMP=emscripten \
 -sFORCE_FILESYSTEM=1 \
 -sNO_EXIT_RUNTIME=0 -sENVIRONMENT=node,web,worker \
 -sMAIN_MODULE=2 -sMODULARIZE=1 -sEXPORT_ES6=1 \
 -sEXPORT_NAME=Module -sALLOW_MEMORY_GROWTH \
+-sALLOW_TABLE_GROWTH \
 -sERROR_ON_UNDEFINED_SYMBOLS=0 \
 -sEXPORTED_RUNTIME_METHODS=$EXPORTED_RUNTIME_METHODS \
 -sTOTAL_MEMORY=32MB \
@@ -91,20 +91,18 @@ emmake make OPTFLAGS="" PORTNAME=emscripten -C pglite/ dist || { echo 'error: ma
 PATH=$SAVE_PATH
 
 # Step 5: make and install pglite
-# TRAMPOLINE MODE: Removed addFunction,removeFunction and ALLOW_TABLE_GROWTH
-# This makes the WASM compatible with Cloudflare Workers which block runtime WASM compilation
-# Callbacks are now set via Module._pgliteCallbacks and EM_JS trampolines in pglite-comm.h
-# LZ4 compression: -sLZ4=1 enables lazy decompression for preloaded files
-# This compresses pglite.data from ~4.7MB to ~2.0MB with on-demand decompression
-EXPORTED_RUNTIME_METHODS="MEMFS,IDBFS,FS,setValue,getValue,UTF8ToString,stringToNewUTF8,stringToUTF8OnStack,wasmTable"
+# addFunction/removeFunction are needed for PostgreSQL read/write callbacks
+# ALLOW_TABLE_GROWTH enables runtime function table modification
+# NOTE: LZ4 compression removed - causes Aborted() at runtime
+EXPORTED_RUNTIME_METHODS="MEMFS,IDBFS,FS,setValue,getValue,UTF8ToString,stringToNewUTF8,stringToUTF8OnStack,wasmTable,addFunction,removeFunction"
 PGLITE_EMSCRIPTEN_FLAGS="-sWASM_BIGINT \
 -sSUPPORT_LONGJMP=emscripten \
 -sFORCE_FILESYSTEM=1 \
 -sNO_EXIT_RUNTIME=1 -sENVIRONMENT=node,web,worker \
 -sMAIN_MODULE=2 -sMODULARIZE=1 -sEXPORT_ES6=1 \
 -sEXPORT_NAME=Module -sALLOW_MEMORY_GROWTH \
+-sALLOW_TABLE_GROWTH \
 -sERROR_ON_UNDEFINED_SYMBOLS=0 \
--sLZ4=1 \
 -sEXPORTED_RUNTIME_METHODS=$EXPORTED_RUNTIME_METHODS"
 # Building pglite itself needs to be the last step because of the PRELOAD_FILES parameter (a list of files and folders) need to be available.
 PGLITE_CFLAGS="$PGLITE_CFLAGS $PGLITE_EMSCRIPTEN_FLAGS" emmake make PORTNAME=emscripten -j -C src/backend/ install-pglite || { echo 'emmake make OPTFLAGS="" PORTNAME=emscripten -j -C pglite' ; exit 51; }
