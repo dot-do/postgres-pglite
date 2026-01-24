@@ -43,12 +43,28 @@ def is_extension(path:Path, fullpath:Path):
     if asp.startswith('/lib/postgresql/'):
         if path.suffix == ".so":
             EXTNAME = path.stem
-            dumpcmd = f"{PGROOT}/bin/wasm-objdump -x {fullpath} > {PG_BUILD_DUMPS}/dump.{EXTNAME} 2>/dev/null "
+            # Use wasm-objdump from PATH (consistent with linkimports.sh)
+            dumpcmd = f"wasm-objdump -x {fullpath} > {PG_BUILD_DUMPS}/dump.{EXTNAME} 2>/dev/null "
             os.system(dumpcmd)
 
+            # Generate imports with underscore prefix for linkimports.sh
             os.system(f"OBJDUMP={PG_BUILD_DUMPS}/dump.{EXTNAME} python3 wasm-build/getsyms.py imports > {PGL_DIST_LINK}/imports/{EXTNAME}")
             with open(f"{PGL_DIST_LINK}/imports/{EXTNAME}","r") as f:
                 SYMBOLS=f.readlines()
+
+            # Also write imports WITHOUT underscore prefix to emscripten_extension_imports_dir
+            # This is needed for the Makefile's pglite-exported-functions target which adds underscores later
+            emscripten_ext_imports_dir = PGROOT / "include/postgresql/emscripten/extension/imports"
+            emscripten_ext_imports_dir.mkdir(parents=True, exist_ok=True)
+            imports_file = emscripten_ext_imports_dir / f"{EXTNAME}.imports"
+            with open(imports_file, "w") as f:
+                for sym in SYMBOLS:
+                    # Strip leading underscore if present
+                    sym = sym.strip()
+                    if sym.startswith('_'):
+                        sym = sym[1:]
+                    if sym:
+                        f.write(sym + '\n')
 
         return True
 

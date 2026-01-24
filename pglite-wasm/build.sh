@@ -263,12 +263,12 @@ ________________________________________________________
         # wgpu ???
         export EMCC_FORCE_STDLIBS=1
 
-        # TRAMPOLINE MODE: Removed ALLOW_TABLE_GROWTH for Workers compatibility
         # Use size-optimized flags for production builds
+        # ALLOW_TABLE_GROWTH is needed for PL/pgSQL and other internal PostgreSQL function pointers
         if COPTS="${LOPTS:-"-Oz -flto -fno-exceptions"}" ${CC} ${CC_PGLITE} ${PGINC} -o ${PGL_DIST_JS}/pglite-js.js \
          -sGLOBAL_BASE=${CMA_MB}MB -ferror-limit=1  \
          -sFORCE_FILESYSTEM=1 $EMCC_NODE -sMAIN_MODULE=1 -sEXPORT_ALL -sASSERTIONS=0 \
-             -sALLOW_MEMORY_GROWTH -sERROR_ON_UNDEFINED_SYMBOLS=0 \
+             -sALLOW_MEMORY_GROWTH -sALLOW_TABLE_GROWTH -sERROR_ON_UNDEFINED_SYMBOLS=0 \
              -sEXPORTED_RUNTIME_METHODS=${EXPORTED_RUNTIME_METHODS} \
          ${BUILD_PATH}/pglite.o \
          $LIBPGCORE \
@@ -309,10 +309,10 @@ ________________________________________________________
 
 # LOPTS="-Os -g0"
 #
-        # TRAMPOLINE MODE: Removed ALLOW_TABLE_GROWTH for Workers compatibility
         # Added 'worker' to ENVIRONMENT for Cloudflare Workers
         # LZ4 compression: -sLZ4=1 enables lazy decompression for preloaded files
         # This compresses pglite.data from ~4.7MB to ~2.0MB with on-demand decompression
+        # ALLOW_TABLE_GROWTH is needed for PL/pgSQL and other internal PostgreSQL function pointers
         if COPTS="$LOPTS" ${CC} ${CC_PGLITE} -o ${PGL_DIST_WEB}/pglite.html --shell-file ${WORKSPACE}/pglite-${PG_BRANCH}/repl.html \
          $PGPRELOAD \
          -sGLOBAL_BASE=${CMA_MB}MB -ferror-limit=1 \
@@ -320,7 +320,7 @@ ________________________________________________________
          -sLZ4=1 \
          $LINKER \
          -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=Module \
-             -sALLOW_MEMORY_GROWTH -sERROR_ON_UNDEFINED_SYMBOLS=1 \
+             -sALLOW_MEMORY_GROWTH -sALLOW_TABLE_GROWTH -sERROR_ON_UNDEFINED_SYMBOLS=1 \
              -sEXPORTED_RUNTIME_METHODS=${EXPORTED_RUNTIME_METHODS} \
          ${PGINC} ${BUILD_PATH}/pglite.o \
          $LIBPGCORE \
