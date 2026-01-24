@@ -63,7 +63,7 @@
         "-c", "work_mem=1MB",\
         "-c", "fsync=on",\
         "-c", "synchronous_commit=on",\
-        "-c", "wal_buffers=512KB",\
+        "-c", "wal_buffers=512kB",\
         "-c", "min_wal_size=16MB",\
         "-c", "shared_buffers=4MB",\
         "-c", "max_connections=1"
